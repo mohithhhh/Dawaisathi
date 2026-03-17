@@ -3,13 +3,12 @@ import Razorpay from "razorpay";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { ONE_TIME_PRICE, SUBSCRIPTION_PRICE } from "@/types";
 
-const razorpay = new Razorpay({
-  key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
-
 export async function POST(request: NextRequest) {
   try {
+    const razorpay = new Razorpay({
+      key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+      key_secret: process.env.RAZORPAY_KEY_SECRET!,
+    });
     const supabase = createServerSupabaseClient();
     const {
       data: { session },
