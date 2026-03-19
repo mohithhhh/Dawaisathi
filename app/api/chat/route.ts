@@ -56,8 +56,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "messages array is required" }, { status: 400 });
   }
 
-  const systemMessage = { role: "system", content: buildSystemPrompt(language) };
-  const fullMessages = [systemMessage, ...messages];
+  // Sarvam requires the first non-system message to be from the user.
+  // Any leading assistant messages (e.g. the initial explanation) are folded
+  // into the system prompt as context so they don't break the API.
+  const firstUserIdx = messages.findIndex((m) => m.role === "user");
+  if (firstUserIdx === -1) {
+    return NextResponse.json({ error: "No user message found" }, { status: 400 });
+  }
+
+  const contextMessages = messages.slice(0, firstUserIdx);
+  const conversationMessages = messages.slice(firstUserIdx);
+
+  let systemContent = buildSystemPrompt(language);
+  if (contextMessages.length > 0) {
+    systemContent +=
+      "\n\nThe patient has already been given this medicine explanation — use it as context for their follow-up questions:\n\n" +
+      contextMessages.map((m) => m.content).join("\n\n");
+  }
+
+  const systemMessage = { role: "system", content: systemContent };
+  const fullMessages = [systemMessage, ...conversationMessages];
 
   const encoder = new TextEncoder();
 
@@ -98,6 +116,37 @@ export async function POST(request: NextRequest) {
         const decoder = new TextDecoder();
         let buffer = "";
 
+        // State machine to strip <think>...</think> blocks from streamed output
+        let thinkState: "before" | "inside" | "after" = "before";
+        let thinkAccum = "";
+
+        function processThink(text: string): string {
+          if (thinkState === "after") return text;
+          thinkAccum += text;
+          if (thinkState === "before") {
+            if (thinkAccum.startsWith("<think>") || (thinkAccum.length < 7 && "<think>".startsWith(thinkAccum))) {
+              thinkState = "inside";
+            } else if (thinkAccum.length >= 7) {
+              thinkState = "after";
+              const out = thinkAccum;
+              thinkAccum = "";
+              return out;
+            } else {
+              return ""; // still checking
+            }
+          }
+          if (thinkState === "inside") {
+            const endIdx = thinkAccum.indexOf("</think>");
+            if (endIdx !== -1) {
+              thinkState = "after";
+              const out = thinkAccum.slice(endIdx + 8).trimStart();
+              thinkAccum = "";
+              return out;
+            }
+          }
+          return "";
+        }
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -113,9 +162,10 @@ export async function POST(request: NextRequest) {
 
             try {
               const json = JSON.parse(trimmed.slice(6));
-              const text = json.choices?.[0]?.delta?.content;
-              if (text) {
-                send(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+              const raw = json.choices?.[0]?.delta?.content;
+              if (raw) {
+                const text = processThink(raw);
+                if (text) send(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
               }
               if (json.choices?.[0]?.finish_reason === "stop") {
                 send(`data: ${JSON.stringify({ type: "done" })}\n\n`);

@@ -178,7 +178,7 @@ export default function ImageUpload({
         </button>
         <div className="px-3 py-2 bg-surface border-t border-border">
           <p className="text-accent text-xs font-medium">
-            📷 Image uploaded — medicine name will be extracted automatically
+            Image uploaded — medicine name will be extracted automatically
           </p>
         </div>
       </div>
@@ -214,12 +214,14 @@ export default function ImageUpload({
 
         {preprocessing ? (
           <>
-            <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-            <p className="text-accent text-xs font-medium">Enhancing image...</p>
+            <div className="w-5 h-5 border border-accent border-t-transparent rounded-full animate-spin" />
+            <p className="text-accent text-xs">Enhancing image...</p>
           </>
         ) : (
           <>
-            <div className="text-3xl">📷</div>
+            <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
             <div className="text-center">
               <p className="text-text-secondary text-sm font-medium">
                 {isDragging ? "Drop image here" : "Upload medicine photo"}

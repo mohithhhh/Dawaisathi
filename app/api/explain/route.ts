@@ -16,23 +16,31 @@ const LANGUAGE_NAMES: Record<Language, string> = {
 };
 
 function buildExplainPrompt(medicineName: string): string {
-  return `You are a helpful pharmacist explaining a medicine to a patient in India.
-Explain the medicine "${medicineName}" in English with exactly this structure:
+  return `You are a medicine information assistant for Indian patients.
 
-1. **Use**: One simple sentence about what this medicine treats
-2. **How to take**: Timing, with/without food, typical dosage guidance
-3. **Remember**: One important caution or side effect
-4. **Other brand names**: 2-3 alternative brand names for the same medicine
+Medicine: ${medicineName}
+
+Explain this medicine in English using exactly this structure:
+
+**What is this medicine?**
+What condition this treats — one simple sentence.
+
+**How to take it?**
+When to take, how many times a day, before or after food.
+
+**Important warning**
+One critical thing — side effect, food to avoid, or storage.
+
+**Other brand names**
+2-3 Indian brand names for the same medicine.
 
 Rules:
-- Write entirely in clear, simple English
-- Keep it under 150 words total
-- Use simple, everyday language a patient can understand
-- Use a warm, reassuring tone like a trusted pharmacist
-- Do NOT use any HTML tags
-- Brand names may stay in English
+- Simple English, zero medical jargon
+- Each section 2-3 sentences maximum
+- Warm pharmacist tone
+- Total under 150 words
 
-Respond directly with the explanation, no preamble.`;
+Respond directly, no preamble.`;
 }
 
 async function geminiOCR(imageBase64: string, mimeType: string): Promise<string> {
@@ -114,7 +122,10 @@ async function sarvamTranslate(text: string, targetLanguage: Language): Promise<
   });
   if (!res.ok) return text;
   const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() || text;
+  const raw: string = data.choices?.[0]?.message?.content || "";
+  // Strip <think>...</think> reasoning blocks emitted by sarvam-m
+  const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  return cleaned || text;
 }
 
 export async function POST(request: NextRequest) {

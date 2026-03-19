@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DawaiSathi (दवाई साथी) — Medicine Explainer",
+  title: "DawaiSathi — Medicine Explainer",
   description:
     "Understand your medicines in Hindi, Kannada, Telugu, Tamil, Malayalam & English. Simple explanations for Indian patients.",
   keywords: "medicine, दवाई, pharmacy, India, Hindi, Kannada, Telugu",
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💊</text></svg>",
   },
   openGraph: {
-    title: "DawaiSathi — दवाई साथी",
+    title: "DawaiSathi",
     description: "Medicine explanations in your language",
     type: "website",
   },

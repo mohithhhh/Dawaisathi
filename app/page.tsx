@@ -1,22 +1,29 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase";
 import AuthModal from "@/components/AuthModal";
 import ImageUpload from "@/components/ImageUpload";
 import LanguageSelector from "@/components/LanguageSelector";
-import ExplanationCard from "@/components/ExplanationCard";
+import ChatInterface from "@/components/ChatInterface";
 import PaywallModal from "@/components/PaywallModal";
 import UsageBar from "@/components/UsageBar";
 import LandingPage from "@/components/LandingPage";
 import type { Language, UserProfile } from "@/types";
-import { FREE_TIER_LIMIT } from "@/types";
-import ChatInterface from "@/components/ChatInterface";
+import { FREE_TIER_LIMIT, LANGUAGE_LABELS } from "@/types";
+
+const FREE_STORAGE_KEY = "dw_free_count";
+
+function toTitleCase(s: string) {
+  return s.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+type ChatMsg = { role: "user" | "assistant"; content: string };
 
 // ─── App Tool ─────────────────────────────────────────────────────────────────
-function AppTool() {
+function AppTool({ onGoHome }: { onGoHome: () => void }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -26,18 +33,33 @@ function AppTool() {
   const [showAuth, setShowAuth] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"explain" | "chat">("explain");
   const [medicineName, setMedicineName] = useState("");
   const [language, setLanguage] = useState<Language>("hindi");
   const [imageBase64, setImageBase64] = useState("");
   const [imageMediaType, setImageMediaType] = useState("");
   const [imageLoading, setImageLoading] = useState(false);
 
-  const [explanation, setExplanation] = useState("");
   const [extractedMedicine, setExtractedMedicine] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Chat state
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
+  const explanationAccum = useRef("");
+
+  // Free query counter
+  const [freeCount, setFreeCount] = useState(FREE_TIER_LIMIT);
+  useEffect(() => {
+    const saved = localStorage.getItem(FREE_STORAGE_KEY);
+    if (saved !== null) setFreeCount(parseInt(saved, 10));
+  }, []);
+
+  // Auto-scroll to chat when it appears
+  const chatRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (isLoading) chatRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [isLoading]);
 
   const fetchUserProfile = useCallback(async () => {
     try {
@@ -88,29 +110,28 @@ function AppTool() {
     setImageLoading(false);
   };
 
-  const checkPaywall = () => {
-    if (!user) return false;
-    const isPaid =
-      user.plan === "paid" ||
-      (user.plan === "subscription" &&
-        user.subscription_end &&
-        new Date(user.subscription_end) > new Date());
-    return !isPaid && user.explanation_count >= FREE_TIER_LIMIT;
+  const handleSearchAgain = () => {
+    setShowChat(false);
+    setChatMessages([]);
+    setExtractedMedicine("");
+    setMedicineName("");
+    setImageBase64("");
+    setImageMediaType("");
+    setError("");
+    explanationAccum.current = "";
   };
 
   const handleSubmit = async () => {
-    if (isStreaming || isLoading) return;
+    if (isLoading) return;
     if (!medicineName.trim() && !imageBase64) {
       setError("Please enter a medicine name or upload a photo");
       return;
     }
-    if (checkPaywall()) { setShowPaywall(true); return; }
 
     setError("");
-    setExplanation("");
     setExtractedMedicine("");
+    explanationAccum.current = "";
     setIsLoading(true);
-    setIsStreaming(false);
 
     try {
       const res = await fetch("/api/explain", {
@@ -135,8 +156,6 @@ function AppTool() {
       const reader = res.body?.getReader();
       if (!reader) { setError("Failed to read response"); setIsLoading(false); return; }
 
-      setIsLoading(false);
-      setIsStreaming(true);
       setImageLoading(false);
 
       const decoder = new TextDecoder();
@@ -157,13 +176,16 @@ function AppTool() {
               setExtractedMedicine(data.medicine_name);
               if (!medicineName && data.medicine_name) setMedicineName(data.medicine_name);
             } else if (data.type === "text") {
-              setExplanation((prev) => prev + data.text);
+              explanationAccum.current += data.text;
             } else if (data.type === "done") {
-              setIsStreaming(false);
+              const initialMsg: ChatMsg = { role: "assistant", content: explanationAccum.current };
+              setChatMessages([initialMsg]);
+              setIsLoading(false);
+              setShowChat(true);
               if (data.usage_count !== null) await fetchUserProfile();
             } else if (data.type === "error") {
               setError(data.error);
-              setIsStreaming(false);
+              setIsLoading(false);
             }
           } catch { /* skip malformed SSE */ }
         }
@@ -171,7 +193,6 @@ function AppTool() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error. Please try again.");
       setIsLoading(false);
-      setIsStreaming(false);
     }
   };
 
@@ -192,41 +213,53 @@ function AppTool() {
     await handleSubmit();
   };
 
-  const displayMedicine = extractedMedicine || medicineName;
-  const hasResult = explanation.length > 0;
-  const canSubmit = (medicineName.trim().length > 0 || imageBase64.length > 0) && !isLoading && !isStreaming;
+  const displayMedicine = toTitleCase(extractedMedicine || medicineName);
+  const canSubmit = (medicineName.trim().length > 0 || imageBase64.length > 0) && !isLoading;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col animate-fade-in">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">💊</span>
-            <div>
-              <p className="text-text-primary font-bold text-sm leading-tight">DawaiSathi</p>
-              <p className="text-muted text-xs leading-tight">Medicine Companion</p>
-            </div>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header — matches landing page nav style */}
+      <header className="sticky top-0 z-40 border-b border-border/50 app-header">
+        <div className="px-6 sm:px-10 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={onGoHome}
+              className="font-semibold text-sm tracking-wide shrink-0 hover:opacity-80 transition-opacity"
+              style={{ color: "#f0f8ff" }}
+            >DawaiSathi</button>
+            {showChat && displayMedicine && (
+              <>
+                <span style={{ color: "rgba(255,255,255,0.2)" }}>·</span>
+                <span className="text-sm text-text-secondary truncate">{displayMedicine}</span>
+                <span className="text-xs text-muted shrink-0 hidden sm:block">{LANGUAGE_LABELS[language]}</span>
+              </>
+            )}
           </div>
-
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            {showChat && (
+              <button
+                onClick={handleSearchAgain}
+                className="text-xs px-3 py-1.5 rounded-full border border-border/60 hover:border-border transition-all text-muted hover:text-text-secondary"
+              >
+                Search again
+              </button>
+            )}
             {!authLoading && (
               user ? (
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => router.push("/history")}
-                    className="text-muted hover:text-accent transition-colors text-sm px-2 py-1 rounded-lg hover:bg-surface-2"
-                    title="History"
-                  >📋</button>
+                    className="text-muted hover:text-text-secondary transition-colors text-xs px-2 py-1"
+                  >History</button>
                   <button
                     onClick={handleSignOut}
-                    className="text-muted text-xs px-3 py-1.5 rounded-full border border-border hover:border-accent/30 hover:text-text-primary transition-all"
+                    className="text-muted text-xs px-3 py-1.5 rounded-full border border-border/60 hover:border-border transition-all"
                   >Sign out</button>
                 </div>
               ) : (
                 <button
                   onClick={() => setShowAuth(true)}
-                  className="text-sm font-medium px-3 py-1.5 rounded-full border border-accent/30 hover:border-accent transition-all"
+                  className="text-xs font-medium px-3 py-1.5 rounded-full border border-accent/30 hover:border-accent/60 transition-all"
                   style={{ color: "#fbe2a7" }}
                 >Login</button>
               )
@@ -236,137 +269,109 @@ function AppTool() {
       </header>
 
       {/* Main */}
-      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 flex flex-col gap-5">
+      <main className={`flex-1 w-full flex flex-col ${showChat ? "max-w-4xl mx-auto px-6 sm:px-10 pt-0 pb-0" : "px-4 sm:px-6"}`}>
 
-        {/* Tab bar */}
-        <div className="flex rounded-xl border border-border overflow-hidden bg-surface">
-          {(["explain", "chat"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className="flex-1 py-2.5 text-sm font-medium transition-all"
-              style={
-                activeTab === tab
-                  ? { background: "rgba(251,226,167,0.12)", color: "#fbe2a7", borderBottom: "2px solid #fbe2a7" }
-                  : { color: "#6b8a9a", borderBottom: "2px solid transparent" }
-              }
-            >
-              {tab === "explain" ? "💊 Explain" : "💬 Chat"}
-            </button>
-          ))}
-        </div>
-
-        {user && !authLoading && activeTab === "explain" && (
-          <UsageBar count={user.explanation_count} plan={user.plan} onUpgrade={() => setShowPaywall(true)} />
-        )}
-
-        {/* Chat tab */}
-        {activeTab === "chat" && (
-          <ChatInterface language={language} onLanguageChange={setLanguage} />
-        )}
-
-        {/* Explain tab content */}
-        {activeTab === "explain" && <><div className="bg-surface border border-border rounded-2xl p-4 space-y-4">
-          <div>
-            <label className="block text-text-secondary text-sm font-medium mb-2">
-              Medicine Name
-            </label>
-            <input
-              type="text"
-              value={medicineName}
-              onChange={(e) => setMedicineName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              placeholder="e.g. Paracetamol, Metformin, Azithromycin..."
-              disabled={isLoading || isStreaming}
-              className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 text-text-primary placeholder-muted focus:outline-none focus:border-accent transition-colors disabled:opacity-60"
-            />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-muted text-xs">OR</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-
-          <ImageUpload
-            onImageSelect={handleImageSelect}
-            onClear={handleImageClear}
-            hasImage={!!imageBase64}
-            isLoading={imageLoading && (isLoading || isStreaming)}
-          />
-
-          <LanguageSelector selected={language} onChange={setLanguage} disabled={isLoading || isStreaming} />
-
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className={`w-full py-3.5 rounded-xl font-bold text-base transition-all ${isLoading ? "animate-pulse-slow" : ""}`}
-            style={
-              canSubmit
-                ? {
-                    background: "linear-gradient(135deg, #fbe2a7 0%, #f0d090 100%)",
-                    color: "#0d1c24",
-                    boxShadow: "0 0 20px rgba(251,226,167,0.25)",
-                  }
-                : { background: "#1a3040", color: "#6b8a9a", cursor: "not-allowed" }
-            }
-          >
-            {isLoading ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                Processing...
-              </span>
-            ) : (
-              "Explain 💊"
+        {/* Form view — vertically centered, no scroll needed */}
+        {!showChat && !isLoading && (
+          <div className="flex-1 flex flex-col items-center justify-center py-6 gap-3">
+            {user && !authLoading && (
+              <div className="w-full max-w-[680px]">
+                <UsageBar count={user.explanation_count} plan={user.plan} onUpgrade={() => setShowPaywall(true)} />
+              </div>
             )}
-          </button>
 
-          {error && (
-            <div className="bg-danger/10 border border-danger/20 rounded-xl px-4 py-3 flex items-start gap-2">
-              <span className="text-danger shrink-0">⚠</span>
-              <div>
-                <p className="text-danger text-sm">{error}</p>
-                <button onClick={handleSubmit} className="text-danger/70 hover:text-danger text-xs mt-1 underline">
-                  Try again
-                </button>
+            <div className="app-section app-card w-full max-w-[680px] flex flex-col gap-4" style={{ animationDelay: "0.05s" }}>
+              <input
+                type="text"
+                value={medicineName}
+                onChange={(e) => setMedicineName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                placeholder="Medicine name — e.g. Paracetamol, Metformin..."
+                disabled={isLoading}
+                className="w-full bg-transparent border-b border-border/60 pb-3 text-text-primary placeholder-muted/60 focus:outline-none focus:border-accent/50 transition-colors text-sm"
+              />
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                <span className="text-muted/50 text-xs tracking-widest">OR</span>
+                <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              </div>
+
+              <ImageUpload
+                onImageSelect={handleImageSelect}
+                onClear={handleImageClear}
+                hasImage={!!imageBase64}
+                isLoading={imageLoading && isLoading}
+              />
+
+              <LanguageSelector selected={language} onChange={setLanguage} disabled={isLoading} />
+
+              <button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className="w-full rounded-xl text-sm transition-all duration-200"
+                style={{
+                  height: "52px",
+                  background: "#fbe2a7",
+                  color: "#0d1c24",
+                  fontWeight: 700,
+                  opacity: canSubmit ? 1 : 0.4,
+                  cursor: canSubmit ? "pointer" : "not-allowed",
+                }}
+              >
+                Explain
+              </button>
+
+              {!user && !authLoading && (
+                <p className="text-muted/50 text-xs text-center">
+                  <button onClick={() => setShowAuth(true)} className="hover:text-muted transition-colors underline underline-offset-2">
+                    Login
+                  </button>{" "}to save history
+                </p>
+              )}
+
+              {error && (
+                <p className="text-danger/80 text-xs text-center">{error}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Loading animation */}
+        <div ref={chatRef} className={showChat ? "flex-1 flex flex-col min-h-0" : ""}>
+          {isLoading && (
+            <div className="app-section flex-1 flex flex-col items-center justify-center gap-5">
+              <div className="relative w-14 h-14">
+                <div className="absolute inset-0 rounded-full" style={{ border: "2px solid rgba(251,226,167,0.08)" }} />
+                <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-accent animate-spin" />
+                <div className="absolute inset-3 rounded-full animate-pulse" style={{ background: "rgba(251,226,167,0.06)" }} />
+              </div>
+              <div className="text-center">
+                <p className="text-text-secondary text-sm font-medium">Getting explanation...</p>
+                <p className="text-muted text-xs mt-1">Analyzing your medicine</p>
               </div>
             </div>
           )}
+
+          {/* Chat interface */}
+          {showChat && (
+            <div className="app-section flex-1 flex flex-col" style={{ animationDelay: "0s" }}>
+              <ChatInterface
+                language={language}
+                initialMessages={chatMessages}
+                medicineName={displayMedicine}
+                onAskPharmacist={() => setShowAuth(true)}
+              />
+            </div>
+          )}
         </div>
-
-        {/* Result */}
-        {(hasResult || isStreaming) && (
-          <div className="bg-surface border border-border rounded-2xl p-4">
-            <ExplanationCard
-              medicineName={displayMedicine}
-              explanation={explanation}
-              language={language}
-              isStreaming={isStreaming}
-            />
-          </div>
-        )}
-
-        {!user && !authLoading && (
-          <div className="bg-surface border border-border rounded-2xl p-4 text-center">
-            <p className="text-text-secondary text-sm">
-              📱 Login to save history & track queries
-            </p>
-            <button
-              onClick={() => setShowAuth(true)}
-              className="mt-2 text-sm font-medium hover:underline"
-              style={{ color: "#fbe2a7" }}
-            >
-              Login with phone number →
-            </button>
-          </div>
-        )}</>}
       </main>
 
-      <footer className="border-t border-border py-4 px-4 text-center">
-        <p className="text-muted text-xs">
-          ⚕ For information only — not medical advice. Always consult your doctor.
-        </p>
-      </footer>
+      {!showChat && (
+        <footer className="pb-6 text-center">
+          <p className="text-muted/30 text-xs">For information only — not medical advice</p>
+        </footer>
+      )}
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onSuccess={handleAuthSuccess} />}
       {showPaywall && <PaywallModal onClose={() => setShowPaywall(false)} onSuccess={handlePaymentSuccess} user={user} />}
@@ -377,8 +382,7 @@ function AppTool() {
 // ─── Root Page ────────────────────────────────────────────────────────────────
 function HomeContent() {
   const [showApp, setShowApp] = useState(false);
-
-  if (showApp) return <AppTool />;
+  if (showApp) return <AppTool onGoHome={() => setShowApp(false)} />;
   return <LandingPage onEnter={() => setShowApp(true)} />;
 }
 
@@ -387,7 +391,7 @@ export default function Home() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border border-accent/30 border-t-accent rounded-full animate-spin" />
         </div>
       }
     >

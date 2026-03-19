@@ -25,24 +25,21 @@ export default function ExplanationCard({
     <div className="animate-slide-up">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-accent text-lg">💊</span>
-          <div>
-            <h3 className="text-text-primary font-semibold text-base leading-tight">
-              {medicineName}
-            </h3>
-            <span className="text-muted text-xs">
-              {LANGUAGE_LABELS[language]}
-            </span>
-          </div>
+        <div>
+          <h3 className="text-text-primary font-semibold text-base leading-tight">
+            {medicineName}
+          </h3>
+          <span className="text-muted text-xs">
+            {LANGUAGE_LABELS[language]}
+          </span>
         </div>
         {!isStreaming && (
           <button
             onClick={copyToClipboard}
-            className="text-muted hover:text-accent transition-colors text-sm px-2 py-1 rounded-lg hover:bg-surface-2"
+            className="text-muted hover:text-accent transition-colors text-xs px-2 py-1 rounded-lg hover:bg-surface-2 border border-border"
             title="Copy explanation"
           >
-            📋
+            Copy
           </button>
         )}
       </div>
@@ -79,7 +76,7 @@ export default function ExplanationCard({
       {/* Disclaimer */}
       {!isStreaming && (
         <p className="text-muted text-xs mt-2 text-center">
-          ⚕ For information only — not medical advice. Consult your doctor.
+          For information only — not medical advice. Consult your doctor.
         </p>
       )}
     </div>

@@ -129,3 +129,27 @@ body {
 }
 .float-card:hover { transform: translateY(-6px); }
 
+
+/* ── App page header blur ────────────────────────────────────────────────────── */
+.app-header {
+  background: rgba(13, 28, 36, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ── App section entry animation ─────────────────────────────────────────────── */
+@keyframes appSectionIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.app-section {
+  animation: appSectionIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── App card minimal surface ────────────────────────────────────────────────── */
+.app-card {
+  background: rgba(18, 36, 46, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 20px;
+}
