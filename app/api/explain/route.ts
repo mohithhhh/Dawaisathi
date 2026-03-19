@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { FREE_TIER_LIMIT } from "@/types";
 import type { Language } from "@/types";
 
 const LANGUAGE_NAMES: Record<Language, string> = {
@@ -114,7 +112,7 @@ async function sarvamTranslate(text: string, targetLanguage: Language): Promise<
       max_completion_tokens: 700,
     }),
   });
-  if (!res.ok) return text; // fall back to English on error
+  if (!res.ok) return text;
   const data = await res.json();
   return data.choices?.[0]?.message?.content?.trim() || text;
 }
@@ -129,19 +127,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
-    const { data: { session } } = await supabase.auth.getSession();
-
-    let userProfile = null;
-    if (session?.user) {
-      const { data } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", session.user.id)
-        .single();
-      userProfile = data;
-    }
-
     const body = await request.json();
     const { medicine_name, language, image_base64, image_media_type }: {
       medicine_name?: string;
@@ -150,23 +135,6 @@ export async function POST(request: NextRequest) {
       image_media_type?: string;
     } = body;
 
-    // Check usage limits for authenticated users
-    if (session?.user && userProfile) {
-      const isPaid =
-        userProfile.plan === "paid" ||
-        (userProfile.plan === "subscription" &&
-          userProfile.subscription_end &&
-          new Date(userProfile.subscription_end) > new Date());
-
-      if (!isPaid && userProfile.explanation_count >= FREE_TIER_LIMIT) {
-        return NextResponse.json(
-          { error: "free_limit_reached", usage_count: userProfile.explanation_count, plan: userProfile.plan },
-          { status: 402 }
-        );
-      }
-    }
-
-    // Step 1: OCR with Gemini if image provided
     let finalMedicineName = medicine_name;
 
     if (image_base64 && (!medicine_name || medicine_name.trim() === "")) {
@@ -191,20 +159,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Medicine name is required." }, { status: 400 });
     }
 
-    // Step 2: Generate English explanation with Gemini
-    // Step 3: Translate to selected language with Sarvam
-    // Step 4: Stream result as SSE
     const encoder = new TextEncoder();
-    let fullExplanation = "";
 
     const stream = new ReadableStream({
       async start(controller) {
         const send = (chunk: string) => controller.enqueue(encoder.encode(chunk));
         try {
-          // Send medicine name immediately so UI can show it
           send(`data: ${JSON.stringify({ type: "medicine_name", medicine_name: finalMedicineName })}\n\n`);
 
-          // Generate English explanation with Gemini
           const englishExplanation = await geminiExplain(finalMedicineName!);
           if (!englishExplanation) {
             send(`data: ${JSON.stringify({ type: "error", error: "Could not generate explanation. Please try again." })}\n\n`);
@@ -212,29 +174,9 @@ export async function POST(request: NextRequest) {
             return;
           }
 
-          // Translate with Sarvam (no-op for English)
-          fullExplanation = await sarvamTranslate(englishExplanation, language);
-
+          const fullExplanation = await sarvamTranslate(englishExplanation, language);
           send(`data: ${JSON.stringify({ type: "text", text: fullExplanation })}\n\n`);
-
-          // Save to database
-          if (session?.user) {
-            await supabase.from("explanations").insert({
-              user_id: session.user.id,
-              medicine_name: finalMedicineName,
-              language,
-              explanation_text: fullExplanation,
-            });
-            await supabase
-              .from("users")
-              .update({ explanation_count: (userProfile?.explanation_count || 0) + 1 })
-              .eq("id", session.user.id);
-            const newCount = (userProfile?.explanation_count || 0) + 1;
-            send(`data: ${JSON.stringify({ type: "done", usage_count: newCount, plan: userProfile?.plan || "free" })}\n\n`);
-          } else {
-            send(`data: ${JSON.stringify({ type: "done", usage_count: null, plan: "free" })}\n\n`);
-          }
-
+          send(`data: ${JSON.stringify({ type: "done", usage_count: null, plan: "free" })}\n\n`);
           controller.close();
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unknown error";

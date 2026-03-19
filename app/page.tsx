@@ -60,7 +60,7 @@ function AppTool() {
     let unsubscribe = () => {};
     try {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event) => {
+        async (event: string) => {
           if (event === "SIGNED_IN") await fetchUserProfile();
           else if (event === "SIGNED_OUT") setUser(null);
         }
