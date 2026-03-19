@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
         let thinkState: "before" | "inside" | "after" = "before";
         let thinkAccum = "";
 
-        function processThink(text: string): string {
+        const processThink = (text: string): string => {
           if (thinkState === "after") return text;
           thinkAccum += text;
           if (thinkState === "before") {
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
             }
           }
           return "";
-        }
+        };
 
         while (true) {
           const { done, value } = await reader.read();
