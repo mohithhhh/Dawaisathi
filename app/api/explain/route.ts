@@ -45,37 +45,62 @@ Respond directly, no preamble.`;
 
 async function geminiOCR(imageBase64: string, mimeType: string): Promise<string> {
   const apiKey = process.env.GOOGLE_API_KEY;
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inlineData: { mimeType, data: imageBase64 } },
-            {
-              text: `You are reading a medicine packaging image (blister strip, tablet wrapper, bottle label, or box).
-The image may be tilted, rotated, or photographed at an angle — read all text regardless of orientation.
 
-Task: Extract the PRIMARY medicine name — the active pharmaceutical ingredient (generic name) or the most prominent brand name.
+  const DOSAGE_PATTERN = /\b\d+\s*(mg|ml|mcg|iu|g|%)\b|\b(tab\.?|cap\.?|syp\.?|inj\.?|oint\.?|susp\.?|tablet|capsule|syrup|injection|cream|drops?|patch|lotion)\b/gi;
 
-Rules:
-- Ignore: batch numbers, expiry dates, MRP price, "Mfg by", dosage numbers (e.g. "500mg"), storage instructions
-- Prefer the generic/active ingredient name if visible (e.g. "Paracetamol" over "Crocin")
-- If multiple medicine names appear, return the most prominently printed one
-- Return ONLY the medicine name — no units, no extra words, no punctuation
-- If you truly cannot identify a medicine name, return UNKNOWN`,
-            },
-          ],
-        }],
-        generationConfig: { maxOutputTokens: 50, temperature: 0 },
-      }),
-    }
-  );
-  if (!res.ok) throw new Error(`Gemini OCR failed: ${res.status}`);
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "UNKNOWN";
+  const cleanName = (s: string) =>
+    s.replace(DOSAGE_PATTERN, "").replace(/\s+/g, " ").trim();
+
+  const callGemini = async (promptText: string, temp = 0): Promise<string> => {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inlineData: { mimeType, data: imageBase64 } },
+              { text: promptText },
+            ],
+          }],
+          generationConfig: { maxOutputTokens: 80, temperature: temp },
+        }),
+      }
+    );
+    if (!res.ok) throw new Error(`Gemini OCR failed: ${res.status}`);
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "UNKNOWN";
+  };
+
+  const primaryPrompt = `You are an expert at reading Indian medicine packaging — blister strips, tablet wrappers, bottle labels, syrup bottles, injection vials, and medicine boxes. The image may be blurry, tilted, rotated, or partially obscured.
+
+Extract the medicine name using this priority:
+1. The BRAND NAME printed most prominently (largest/boldest text) — e.g. "Crocin", "Dolo", "Augmentin", "Pan-D", "Combiflam"
+2. If no clear brand name, extract the GENERIC/ACTIVE ingredient — e.g. "Paracetamol", "Metformin", "Omeprazole"
+
+IGNORE completely: dosage numbers (500mg, 10ml), "Tablet"/"Capsule"/"Syrup", batch numbers, expiry dates, MRP/price, company/manufacturer names, addresses, storage instructions.
+
+Return ONLY the medicine name — no dosage, no form suffix, no extra words.
+Good examples: "Crocin" | "Paracetamol" | "Augmentin" | "Pan-D" | "Metformin" | "Pantoprazole"
+Bad examples: "Crocin 650 Tablet" | "Tab. Augmentin 625" | "Paracetamol 500mg"
+
+If you truly cannot read any medicine name, return exactly: UNKNOWN`;
+
+  let result = cleanName(await callGemini(primaryPrompt, 0));
+
+  if (!result || result.toUpperCase() === "UNKNOWN") {
+    // Fallback: simpler broad prompt with slight temperature
+    const fallback = cleanName(
+      await callGemini(
+        `What medicine is shown in this image? Read all text carefully — the package may be at an angle or partially blurry. Return only the medicine name (brand or generic). If you cannot determine the medicine name at all, return UNKNOWN.`,
+        0.2
+      )
+    );
+    if (fallback && fallback.toUpperCase() !== "UNKNOWN") return fallback;
+  }
+
+  return result || "UNKNOWN";
 }
 
 async function geminiExplain(medicineName: string): Promise<string> {
