@@ -64,7 +64,7 @@ async function geminiOCR(imageBase64: string, mimeType: string): Promise<string>
               { text: promptText },
             ],
           }],
-          generationConfig: { maxOutputTokens: 80, temperature: temp },
+          generationConfig: { maxOutputTokens: 80, temperature: temp, thinkingConfig: { thinkingBudget: 0 } },
         }),
       }
     );
@@ -112,7 +112,7 @@ async function geminiExplain(medicineName: string): Promise<string> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: buildExplainPrompt(medicineName) }] }],
-        generationConfig: { maxOutputTokens: 600, temperature: 0.3 },
+        generationConfig: { maxOutputTokens: 800, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
       }),
     }
   );
@@ -121,36 +121,28 @@ async function geminiExplain(medicineName: string): Promise<string> {
   return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 }
 
-async function sarvamTranslate(text: string, targetLanguage: Language): Promise<string> {
+async function geminiTranslate(text: string, targetLanguage: Language): Promise<string> {
   if (targetLanguage === "english") return text;
-  const apiKey = process.env.SARVAM_API_KEY;
-  if (!apiKey) return text;
-
+  const apiKey = process.env.GOOGLE_API_KEY;
   const langName = LANGUAGE_NAMES[targetLanguage];
-  const res = await fetch("https://api.sarvam.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "sarvam-m",
-      messages: [
-        {
-          role: "system",
-          content: `You are a professional medical translator. Translate the following medicine explanation from English to ${langName}. Translate all text including section headers. Keep medicine names, drug names, and brand names in English. Output ONLY the translated text, no preamble.`,
-        },
-        { role: "user", content: text },
-      ],
-      max_completion_tokens: 700,
-    }),
-  });
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `Translate this medicine explanation from English to ${langName}. Keep medicine brand names and drug names in English. Translate everything else including section headers. Output ONLY the translated text, no preamble:\n\n${text}`,
+          }],
+        }],
+        generationConfig: { maxOutputTokens: 2000, temperature: 0, thinkingConfig: { thinkingBudget: 0 } },
+      }),
+    }
+  );
   if (!res.ok) return text;
   const data = await res.json();
-  const raw: string = data.choices?.[0]?.message?.content || "";
-  // Strip <think>...</think> reasoning blocks emitted by sarvam-m
-  const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-  return cleaned || text;
+  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
 }
 
 export async function POST(request: NextRequest) {
@@ -210,7 +202,7 @@ export async function POST(request: NextRequest) {
             return;
           }
 
-          const fullExplanation = await sarvamTranslate(englishExplanation, language);
+          const fullExplanation = await geminiTranslate(englishExplanation, language);
           send(`data: ${JSON.stringify({ type: "text", text: fullExplanation })}\n\n`);
           send(`data: ${JSON.stringify({ type: "done", usage_count: null, plan: "free" })}\n\n`);
           controller.close();

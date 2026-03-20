@@ -22,7 +22,7 @@ function buildSystemPrompt(language: Language): string {
 You MUST:
 - Answer ONLY medicine-related questions (dosage, side effects, drug interactions, storage, alternatives, what a medicine treats, when to take it, precautions).
 - Respond entirely in ${lang}. Every word of your response must be in ${lang} — do not mix languages.
-- Keep answers short, warm, and easy for a non-medical person to understand.
+- Give clear, helpful answers of 3–5 sentences. Be warm and easy for a non-medical person to understand.
 - If a medicine name appears in the conversation, use it as context for follow-up questions.
 
 You MUST NOT:
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
             model: "sarvam-m",
             messages: fullMessages,
             stream: true,
-            max_completion_tokens: 512,
+            max_tokens: 8192,
           }),
         });
 
@@ -124,15 +124,24 @@ export async function POST(request: NextRequest) {
           if (thinkState === "after") return text;
           thinkAccum += text;
           if (thinkState === "before") {
-            if (thinkAccum.startsWith("<think>") || (thinkAccum.length < 7 && "<think>".startsWith(thinkAccum))) {
-              thinkState = "inside";
-            } else if (thinkAccum.length >= 7) {
+            if (thinkAccum.length >= 7) {
+              if (thinkAccum.startsWith("<think>")) {
+                thinkState = "inside";
+                // fall through to check if </think> already in same chunk
+              } else {
+                thinkState = "after";
+                const out = thinkAccum;
+                thinkAccum = "";
+                return out;
+              }
+            } else if (!"<think>".startsWith(thinkAccum)) {
+              // partial prefix can't become <think>, emit immediately
               thinkState = "after";
               const out = thinkAccum;
               thinkAccum = "";
               return out;
             } else {
-              return ""; // still checking
+              return ""; // still accumulating, could be <think>
             }
           }
           if (thinkState === "inside") {
