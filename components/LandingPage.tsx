@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
+import AuthModal from "@/components/AuthModal";
 
 // ─── Scroll Reveal ─────────────────────────────────────────────────────────────
 function useScrollReveal() {
@@ -158,6 +159,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
   const [parallaxY, setParallaxY] = useState(0);
   const [navUser, setNavUser] = useState<{ name: string; avatar_url: string } | null>(null);
   const [showNavMenu, setShowNavMenu] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
   const navMenuRef = useRef<HTMLDivElement>(null);
   useScrollReveal();
 
@@ -292,7 +294,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           </div>
         ) : (
           <button
-            onClick={onEnter}
+            onClick={() => setShowAuth(true)}
             className="text-sm font-semibold px-4 py-2 rounded-xl transition-all active:scale-95"
             style={{ background: "rgba(251,226,167,0.1)", color: "#fbe2a7", border: "1px solid rgba(251,226,167,0.22)" }}
           >
@@ -750,6 +752,8 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
 
         <p className="text-xs" style={{ color: "#4a6a7a" }}>Made for India</p>
       </footer>
+
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} onSuccess={() => setShowAuth(false)} />}
     </div>
   );
 }
