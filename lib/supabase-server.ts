@@ -1,18 +1,23 @@
-// Supabase disabled — mock server client (no-auth mode)
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+
 export function createServerSupabaseClient() {
-  return {
-    auth: {
-      getSession: async () => ({ data: { session: null }, error: null }),
-    },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: async () => ({ data: null, error: null }),
-          order: () => ({ limit: async () => ({ data: [], error: null }) }),
-        }),
-      }),
-      insert: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }), then: () => Promise.resolve({ error: null }) }),
-      update: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
-    }),
-  };
+  const cookieStore = cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: Record<string, unknown>) {
+          cookieStore.set({ name, value, ...options });
+        },
+        remove(name: string, options: Record<string, unknown>) {
+          cookieStore.set({ name, value: "", ...options });
+        },
+      },
+    }
+  );
 }
