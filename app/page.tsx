@@ -150,6 +150,10 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
       setError("Please enter a medicine name or upload a photo");
       return;
     }
+    if (!user) {
+      setShowAuth(true);
+      return;
+    }
 
     setError("");
     setExtractedMedicine("");
