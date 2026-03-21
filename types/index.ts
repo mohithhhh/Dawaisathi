@@ -15,7 +15,9 @@ export type Plan = "free" | "paid" | "subscription";
 
 export interface UserProfile {
   id: string;
-  phone: string;
+  phone?: string;
+  name?: string;
+  avatar_url?: string;
   plan: Plan;
   explanation_count: number;
   subscription_end?: string;

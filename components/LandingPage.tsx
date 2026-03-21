@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { createClient } from "@/lib/supabase";
 
 // ─── Scroll Reveal ─────────────────────────────────────────────────────────────
 function useScrollReveal() {
@@ -170,11 +171,50 @@ function SectionLabel({ children }: { children: string }) {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function LandingPage({ onEnter }: { onEnter: () => void }) {
+  const supabase = createClient();
   const [selectedLang, setSelectedLang] = useState("English");
   const [scrolled, setScrolled] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [parallaxY, setParallaxY] = useState(0);
+  const [navUser, setNavUser] = useState<{ name: string; avatar_url: string } | null>(null);
+  const [showNavMenu, setShowNavMenu] = useState(false);
+  const navMenuRef = useRef<HTMLDivElement>(null);
   useScrollReveal();
+
+  const fetchNavUser = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setNavUser({
+          name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "",
+          avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || "",
+        });
+      } else {
+        setNavUser(null);
+      }
+    } catch { /* silently fail */ }
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchNavUser();
+    try {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event === "SIGNED_IN") fetchNavUser();
+        else if (event === "SIGNED_OUT") setNavUser(null);
+      });
+      return () => subscription.unsubscribe();
+    } catch { return undefined; }
+  }, [supabase.auth, fetchNavUser]);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (navMenuRef.current && !navMenuRef.current.contains(e.target as Node)) {
+        setShowNavMenu(false);
+      }
+    };
+    if (showNavMenu) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showNavMenu]);
 
   useEffect(() => {
     const handler = () => {
@@ -224,13 +264,61 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           <a href="#pricing" className="hover:text-white transition-colors cursor-pointer">Pricing</a>
         </div>
 
-        <button
-          onClick={onEnter}
-          className="text-sm font-semibold px-4 py-2 rounded-xl transition-all active:scale-95"
-          style={{ background: "rgba(251,226,167,0.1)", color: "#fbe2a7", border: "1px solid rgba(251,226,167,0.22)" }}
-        >
-          Open App →
-        </button>
+        {navUser ? (
+          <div className="relative" ref={navMenuRef}>
+            <button
+              onClick={() => setShowNavMenu((v) => !v)}
+              className="flex items-center gap-2 rounded-full hover:opacity-80 transition-opacity"
+            >
+              {navUser.avatar_url ? (
+                <img src={navUser.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+              ) : (
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold"
+                  style={{ background: "rgba(251,226,167,0.15)", color: "#fbe2a7" }}
+                >
+                  {(navUser.name || "U")[0].toUpperCase()}
+                </div>
+              )}
+              <span className="text-sm hidden sm:block" style={{ color: "#a8bec9" }}>
+                {navUser.name?.split(" ")[0] || ""}
+              </span>
+            </button>
+            {showNavMenu && (
+              <div
+                className="absolute right-0 top-full mt-2 w-40 rounded-xl border py-1 z-50"
+                style={{ background: "#12242e", borderColor: "rgba(255,255,255,0.1)" }}
+              >
+                <button
+                  onClick={() => { setShowNavMenu(false); onEnter(); }}
+                  className="w-full text-left px-4 py-2 text-xs transition-colors"
+                  style={{ color: "#a8bec9" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "#f0f8ff"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "#a8bec9"; }}
+                >
+                  Open App
+                </button>
+                <button
+                  onClick={async () => { setShowNavMenu(false); await supabase.auth.signOut(); setNavUser(null); }}
+                  className="w-full text-left px-4 py-2 text-xs transition-colors"
+                  style={{ color: "#a8bec9" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "#f0f8ff"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "#a8bec9"; }}
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={onEnter}
+            className="text-sm font-semibold px-4 py-2 rounded-xl transition-all active:scale-95"
+            style={{ background: "rgba(251,226,167,0.1)", color: "#fbe2a7", border: "1px solid rgba(251,226,167,0.22)" }}
+          >
+            Open App →
+          </button>
+        )}
       </nav>
 
       {/* ════════════════════════════════════════════════════════════════════
