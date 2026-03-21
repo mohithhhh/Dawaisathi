@@ -32,6 +32,8 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
   const [authLoading, setAuthLoading] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const [medicineName, setMedicineName] = useState("");
   const [language, setLanguage] = useState<Language>("hindi");
@@ -63,11 +65,22 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
 
   const fetchUserProfile = useCallback(async () => {
     try {
-      const res = await fetch("/api/user/profile");
-      const data = await res.json();
-      setUser(data.user);
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        setUser({
+          id: authUser.id,
+          phone: authUser.phone,
+          name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split("@")[0] || "",
+          avatar_url: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || "",
+          plan: "free",
+          explanation_count: 0,
+          created_at: authUser.created_at,
+        });
+      } else {
+        setUser(null);
+      }
     } catch { /* silently fail */ }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -96,6 +109,16 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
   useEffect(() => {
     if (searchParams.get("auth") === "required") setShowAuth(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    if (showUserMenu) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showUserMenu]);
 
   const handleImageSelect = (base64: string, mediaType: string) => {
     setImageBase64(base64);
@@ -246,15 +269,44 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
             )}
             {!authLoading && (
               user ? (
-                <div className="flex items-center gap-2">
+                <div className="relative" ref={menuRef}>
                   <button
-                    onClick={() => router.push("/history")}
-                    className="text-muted hover:text-text-secondary transition-colors text-xs px-2 py-1"
-                  >History</button>
-                  <button
-                    onClick={handleSignOut}
-                    className="text-muted text-xs px-3 py-1.5 rounded-full border border-border/60 hover:border-border transition-all"
-                  >Sign out</button>
+                    onClick={() => setShowUserMenu((v) => !v)}
+                    className="flex items-center gap-2 rounded-full hover:opacity-80 transition-opacity"
+                  >
+                    {user.avatar_url ? (
+                      <img src={user.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                    ) : (
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold"
+                        style={{ background: "rgba(251,226,167,0.15)", color: "#fbe2a7" }}
+                      >
+                        {(user.name || "U")[0].toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-text-secondary text-xs hidden sm:block">
+                      {user.name?.split(" ")[0] || ""}
+                    </span>
+                  </button>
+                  {showUserMenu && (
+                    <div
+                      className="absolute right-0 top-full mt-2 w-40 rounded-xl border border-border/60 py-1 z-50"
+                      style={{ background: "#12242e" }}
+                    >
+                      <button
+                        onClick={() => { setShowUserMenu(false); router.push("/history"); }}
+                        className="w-full text-left px-4 py-2 text-xs text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors"
+                      >
+                        My History
+                      </button>
+                      <button
+                        onClick={() => { setShowUserMenu(false); handleSignOut(); }}
+                        className="w-full text-left px-4 py-2 text-xs text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <button
