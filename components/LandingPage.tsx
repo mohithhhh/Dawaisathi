@@ -109,26 +109,6 @@ const FEATURES = [
   { title: "Free to Start", desc: "3 free explanations. No account, no credit card — start immediately." },
 ];
 
-const TESTIMONIALS = [
-  {
-    name: "Rajesh Kumar",
-    city: "Patna, Bihar",
-    lang: "हिंदी",
-    quote: "\"पहले दवाई का पर्चा समझ नहीं आता था। अब DawaiSathi से हिंदी में सब कुछ साफ़ समझ आ जाता है।\"",
-  },
-  {
-    name: "Lakshmi Nair",
-    city: "Thiruvananthapuram, Kerala",
-    lang: "മലയാളം",
-    quote: "\"ഇനി ഡോക്ടറോട് ആവർത്തിച്ചു ചോദിക്കേണ്ടതില്ല. ഫോണിൽ ഫോട്ടോ എടുത്ത് ഉടൻ മനസ്സിലാകും.\"",
-  },
-  {
-    name: "Priya Subramaniam",
-    city: "Chennai, Tamil Nadu",
-    lang: "தமிழ்",
-    quote: "\"என் அம்மாவுக்கு இப்போது மருந்தைப் பற்றி தமிழில் தெரியும். மிகவும் உதவியாக இருக்கிறது.\"",
-  },
-];
 
 const PRICING = [
   {
@@ -627,66 +607,12 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          TESTIMONIALS — 3D tilt on mouse move
-      ══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16" data-reveal>
-            <SectionLabel>Patient Stories</SectionLabel>
-            <h2 className="font-bold" style={{ fontSize: "clamp(1.8rem, 4vw, 2.8rem)" }}>
-              Families across India trust us
-            </h2>
-          </div>
-
-          <div className="grid sm:grid-cols-3 gap-5">
-            {TESTIMONIALS.map((t, i) => (
-              <div
-                key={t.name}
-                data-reveal
-                data-delay={String(i + 1)}
-                className="rounded-2xl p-6 flex flex-col card-hover"
-                style={{ background: "#0e2030", border: "1px solid rgba(255,255,255,0.07)" }}
-              >
-                {/* Stars */}
-                <div className="flex gap-0.5 mb-4" style={{ color: "#fbe2a7" }}>
-                  {"★★★★★".split("").map((s, j) => <span key={j}>{s}</span>)}
-                </div>
-
-                <p className="text-sm leading-relaxed mb-6 flex-1" style={{ color: "#c4d8e0", fontStyle: "italic" }}>
-                  {t.quote}
-                </p>
-
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                    style={{ background: "rgba(251,226,167,0.12)", color: "#fbe2a7" }}
-                  >
-                    {t.name[0]}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold truncate">{t.name}</p>
-                    <p className="text-xs truncate" style={{ color: "#6b8a9a" }}>{t.city}</p>
-                  </div>
-                  <span
-                    className="ml-auto text-xs px-2 py-0.5 rounded-full flex-shrink-0"
-                    style={{ background: "rgba(251,226,167,0.07)", color: "#fbe2a7", border: "1px solid rgba(251,226,167,0.15)" }}
-                  >
-                    {t.lang}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════════════════════════════════
           PRICING — highlighted card breathes glow
       ══════════════════════════════════════════════════════════════════════ */}
       <section
         id="pricing"
         className="py-24 px-6"
-        style={{ background: "#0e2030" }}
+        style={{ background: "#0d1c24" }}
       >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16" data-reveal>
@@ -778,7 +704,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             Ready to understand your medicine?
           </h2>
           <p className="mb-10 text-base leading-relaxed max-w-lg mx-auto" style={{ color: "#a8bec9" }}>
-            Join thousands of Indian families who now understand their prescriptions clearly — in their own language.
+            Join Indian families who now understand their prescriptions clearly — in their own language.
           </p>
           <button
             onClick={onEnter}
