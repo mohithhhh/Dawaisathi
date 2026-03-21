@@ -316,7 +316,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             className="text-sm font-semibold px-4 py-2 rounded-xl transition-all active:scale-95"
             style={{ background: "rgba(251,226,167,0.1)", color: "#fbe2a7", border: "1px solid rgba(251,226,167,0.22)" }}
           >
-            Open App →
+            Sign in
           </button>
         )}
       </nav>
