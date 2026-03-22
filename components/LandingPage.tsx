@@ -352,7 +352,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           </p>
 
           {/* Language pills */}
-          <div className="flex flex-wrap justify-center gap-2 mb-8">
+          <div className="hidden sm:flex flex-wrap justify-center gap-2 mb-8">
             {LANGS.map((lang) => (
               <button
                 key={lang}

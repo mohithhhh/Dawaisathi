@@ -394,7 +394,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
         )}
 
         {/* Loading animation */}
-        <div ref={chatRef} className={showChat ? "flex-1 flex flex-col min-h-0" : ""}>
+        <div ref={chatRef} className={showChat ? "flex-1 flex flex-col min-h-0" : isLoading ? "flex-1 flex flex-col" : ""}>
           {isLoading && (
             <div className="app-section flex-1 flex flex-col items-center justify-center gap-5">
               <div className="relative w-14 h-14">
