@@ -61,6 +61,7 @@ export default function ChatInterface({ language, initialMessages = [], onAskPha
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState("");
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -290,7 +291,7 @@ export default function ChatInterface({ language, initialMessages = [], onAskPha
       {onAskPharmacist && (
         <div className="flex justify-center pb-2 pt-1">
           <button
-            onClick={onAskPharmacist}
+            onClick={() => setShowComingSoon(true)}
             className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-full transition-all"
             style={{
               background: "rgba(74,222,128,0.07)",
@@ -305,6 +306,28 @@ export default function ChatInterface({ language, initialMessages = [], onAskPha
             </svg>
             Ask a pharmacist
           </button>
+        </div>
+      )}
+
+      {/* Coming Soon modal */}
+      {showComingSoon && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowComingSoon(false)}>
+          <div className="rounded-2xl p-8 max-w-sm w-full text-center" style={{ background: "#12242e", border: "1px solid rgba(255,255,255,0.08)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-4">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fbe2a7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
+            </div>
+            <h3 className="font-bold text-lg mb-2" style={{ color: "#f0f8ff" }}>Coming Soon</h3>
+            <p className="text-sm mb-6" style={{ color: "#a8bec9" }}>
+              Connect with a real pharmacist for personalised guidance. We're working on it!
+            </p>
+            <button
+              onClick={() => setShowComingSoon(false)}
+              className="px-6 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95"
+              style={{ background: "rgba(251,226,167,0.12)", color: "#fbe2a7", border: "1px solid rgba(251,226,167,0.2)" }}
+            >
+              Got it
+            </button>
+          </div>
         </div>
       )}
 

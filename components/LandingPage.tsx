@@ -394,20 +394,6 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           <p className="text-xs" style={{ color: "#6b8a9a" }}>3 free explanations · No signup needed</p>
         </main>
 
-        {/* Scroll cue */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5" style={{ color: "rgba(251,226,167,0.35)", zIndex: 2 }}>
-          <span style={{ fontSize: 9, letterSpacing: "0.18em" }} className="uppercase">scroll</span>
-          <svg className="bob" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M2 5l5 5 5-5" />
-          </svg>
-        </div>
-
-        {/* Star */}
-        <div className="absolute bottom-5 right-6" style={{ color: "rgba(255,255,255,0.18)", zIndex: 2 }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L13.7 10.3L22 12L13.7 13.7L12 22L10.3 13.7L2 12L10.3 10.3Z" />
-          </svg>
-        </div>
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════

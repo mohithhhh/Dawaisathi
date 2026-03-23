@@ -1,73 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Language } from "@/types";
-
-const LANGUAGE_NAMES: Record<Language, string> = {
-  hindi: "Hindi",
-  english: "English",
-  bengali: "Bengali",
-  gujarati: "Gujarati",
-  kannada: "Kannada",
-  malayalam: "Malayalam",
-  marathi: "Marathi",
-  odia: "Odia",
-  punjabi: "Punjabi",
-  tamil: "Tamil",
-  telugu: "Telugu",
-};
-
-function buildExplainPrompt(medicineName: string): string {
-  return `You are a medicine information assistant for Indian patients.
-
-Medicine: ${medicineName}
-
-Explain this medicine in English using exactly this structure:
-
-**What is this medicine?**
-What condition this treats — one simple sentence.
-
-**How to take it?**
-When to take, how many times a day, before or after food.
-
-**Important warning**
-One critical thing — side effect, food to avoid, or storage.
-
-**Other brand names**
-2-3 Indian brand names for the same medicine.
-
-Rules:
-- Simple English, zero medical jargon
-- Each section 2-3 sentences maximum
-- Warm pharmacist tone
-- Total under 150 words
-
-Respond directly, no preamble.`;
-}
+import { geminiExplain, geminiTranslate, geminiPost } from "@/lib/ai";
 
 async function geminiOCR(imageBase64: string, mimeType: string): Promise<string> {
-  const apiKey = process.env.GOOGLE_API_KEY;
-
   const DOSAGE_PATTERN = /\b\d+\s*(mg|ml|mcg|iu|g|%)\b|\b(tab\.?|cap\.?|syp\.?|inj\.?|oint\.?|susp\.?|tablet|capsule|syrup|injection|cream|drops?|patch|lotion)\b/gi;
 
   const cleanName = (s: string) =>
     s.replace(DOSAGE_PATTERN, "").replace(/\s+/g, " ").trim();
 
   const callGemini = async (promptText: string, temp = 0): Promise<string> => {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inlineData: { mimeType, data: imageBase64 } },
-              { text: promptText },
-            ],
-          }],
-          generationConfig: { maxOutputTokens: 80, temperature: temp, thinkingConfig: { thinkingBudget: 0 } },
-        }),
-      }
-    );
+    const res = await geminiPost({
+      contents: [{
+        parts: [
+          { inlineData: { mimeType, data: imageBase64 } },
+          { text: promptText },
+        ],
+      }],
+      generationConfig: { maxOutputTokens: 80, temperature: temp, thinkingConfig: { thinkingBudget: 0 } },
+    });
     if (!res.ok) throw new Error(`Gemini OCR failed: ${res.status}`);
     const data = await res.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "UNKNOWN";
@@ -90,7 +40,6 @@ If you truly cannot read any medicine name, return exactly: UNKNOWN`;
   let result = cleanName(await callGemini(primaryPrompt, 0));
 
   if (!result || result.toUpperCase() === "UNKNOWN") {
-    // Fallback: simpler broad prompt with slight temperature
     const fallback = cleanName(
       await callGemini(
         `What medicine is shown in this image? Read all text carefully — the package may be at an angle or partially blurry. Return only the medicine name (brand or generic). If you cannot determine the medicine name at all, return UNKNOWN.`,
@@ -101,48 +50,6 @@ If you truly cannot read any medicine name, return exactly: UNKNOWN`;
   }
 
   return result || "UNKNOWN";
-}
-
-async function geminiExplain(medicineName: string): Promise<string> {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: buildExplainPrompt(medicineName) }] }],
-        generationConfig: { maxOutputTokens: 800, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
-      }),
-    }
-  );
-  if (!res.ok) throw new Error(`Gemini explain failed: ${res.status}`);
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-}
-
-async function geminiTranslate(text: string, targetLanguage: Language): Promise<string> {
-  if (targetLanguage === "english") return text;
-  const apiKey = process.env.GOOGLE_API_KEY;
-  const langName = LANGUAGE_NAMES[targetLanguage];
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `Translate this medicine explanation from English to ${langName}. Keep medicine brand names and drug names in English. Translate everything else including section headers. Output ONLY the translated text, no preamble:\n\n${text}`,
-          }],
-        }],
-        generationConfig: { maxOutputTokens: 2000, temperature: 0, thinkingConfig: { thinkingBudget: 0 } },
-      }),
-    }
-  );
-  if (!res.ok) return text;
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
 }
 
 export async function POST(request: NextRequest) {

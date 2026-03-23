@@ -11,6 +11,7 @@ import ChatInterface from "@/components/ChatInterface";
 import PaywallModal from "@/components/PaywallModal";
 import UsageBar from "@/components/UsageBar";
 import LandingPage from "@/components/LandingPage";
+import PrescriptionTab from "@/components/PrescriptionTab";
 import type { Language, UserProfile } from "@/types";
 import { FREE_TIER_LIMIT, LANGUAGE_LABELS } from "@/types";
 
@@ -28,6 +29,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
   const searchParams = useSearchParams();
   const supabase = createClient();
 
+  const [activeTab, setActiveTab] = useState<"explain" | "prescription">("explain");
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
@@ -327,8 +329,39 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
       {/* Main */}
       <main className={`flex-1 w-full flex flex-col ${showChat ? "max-w-4xl mx-auto px-6 sm:px-10 pt-0 pb-0" : "px-4 sm:px-6"}`}>
 
-        {/* Form view — vertically centered, no scroll needed */}
+        {/* Floating tab toggle */}
         {!showChat && !isLoading && (
+          <div className="flex justify-center pt-6">
+            <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <button
+                onClick={() => setActiveTab("explain")}
+                className="text-sm px-5 py-1.5 rounded-lg transition-all font-medium"
+                style={activeTab === "explain"
+                  ? { background: "rgba(251,226,167,0.14)", color: "#fbe2a7" }
+                  : { color: "#6b8a9a" }}
+              >
+                Explain
+              </button>
+              <button
+                onClick={() => setActiveTab("prescription")}
+                className="text-sm px-5 py-1.5 rounded-lg transition-all font-medium"
+                style={activeTab === "prescription"
+                  ? { background: "rgba(251,226,167,0.14)", color: "#fbe2a7" }
+                  : { color: "#6b8a9a" }}
+              >
+                Prescription
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Prescription tab */}
+        {activeTab === "prescription" && !showChat && (
+          <PrescriptionTab onGoExplain={() => setActiveTab("explain")} />
+        )}
+
+        {/* Form view — vertically centered, no scroll needed */}
+        {activeTab === "explain" && !showChat && !isLoading && (
           <div className="flex-1 flex flex-col items-center justify-center py-6 gap-3">
             {user && !authLoading && (
               <div className="w-full max-w-[680px]">
@@ -393,8 +426,8 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
           </div>
         )}
 
-        {/* Loading animation */}
-        <div ref={chatRef} className={showChat ? "flex-1 flex flex-col min-h-0" : isLoading ? "flex-1 flex flex-col" : ""}>
+        {/* Loading animation + chat — explain tab only */}
+        <div ref={chatRef} className={showChat ? "flex-1 flex flex-col min-h-0" : (activeTab === "explain" && isLoading) ? "flex-1 flex flex-col" : ""}>
           {isLoading && (
             <div className="app-section flex-1 flex flex-col items-center justify-center gap-5">
               <div className="relative w-14 h-14">
@@ -423,7 +456,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
         </div>
       </main>
 
-      {!showChat && (
+      {!showChat && activeTab === "explain" && (
         <footer className="pb-6 text-center">
           <p className="text-muted/30 text-xs">For information only — not medical advice</p>
         </footer>

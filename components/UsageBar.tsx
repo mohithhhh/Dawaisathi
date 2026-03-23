@@ -15,7 +15,7 @@ export default function UsageBar({ count, plan, onUpgrade }: UsageBarProps) {
   if (isPaid) {
     return (
       <div className="flex items-center gap-2 text-xs text-accent bg-accent-glow border border-accent/20 rounded-full px-3 py-1.5">
-        <span>♾️</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 12c-2-2.5-4-4-6-4a4 4 0 0 0 0 8c2 0 4-1.5 6-4zm0 0c2 2.5 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.5-6 4z"/></svg>
         <span className="font-medium">
           {plan === "subscription" ? "Unlimited Plan" : "Paid Access"}
         </span>
