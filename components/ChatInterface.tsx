@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { Language } from "@/types";
+import BuyMedicineLinks from "@/components/BuyMedicineLinks";
+import NearbyHelp from "@/components/NearbyHelp";
 
 interface Message {
   role: "user" | "assistant";
@@ -56,12 +58,14 @@ function AssistantAvatar() {
   );
 }
 
-export default function ChatInterface({ language, initialMessages = [], onAskPharmacist }: ChatInterfaceProps) {
+export default function ChatInterface({ language, initialMessages = [], medicineName, onAskPharmacist }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState("");
   const [showComingSoon, setShowComingSoon] = useState(false);
+  const [showBuyLinks, setShowBuyLinks] = useState(false);
+  const [showNearby, setShowNearby] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -255,6 +259,20 @@ export default function ChatInterface({ language, initialMessages = [], onAskPha
         )}
       </div>
 
+      {/* Nearby inline — shown when toggled */}
+      {showNearby && (
+        <div className="pt-2 pb-1">
+          <NearbyHelp />
+        </div>
+      )}
+
+      {/* Buy links inline — shown when toggled */}
+      {showBuyLinks && medicineName && (
+        <div className="pb-1">
+          <BuyMedicineLinks medicineName={medicineName} />
+        </div>
+      )}
+
       {/* Error banner */}
       {error && (
         <div className="flex justify-center pb-2 px-2">
@@ -287,25 +305,63 @@ export default function ChatInterface({ language, initialMessages = [], onAskPha
         </div>
       )}
 
-      {/* Ask a pharmacist */}
-      {onAskPharmacist && (
-        <div className="flex justify-center pb-2 pt-1">
+      {/* Buy medicine + Nearby + Ask a pharmacist — floating action row */}
+      {!isEmpty && (medicineName || onAskPharmacist) && (
+        <div className="flex justify-center gap-2 pb-2 pt-1 flex-wrap">
+          {medicineName && (
+            <button
+              onClick={() => setShowBuyLinks((v) => !v)}
+              className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-full transition-all"
+              style={{
+                background: showBuyLinks ? "rgba(251,226,167,0.14)" : "rgba(251,226,167,0.07)",
+                border: "1px solid rgba(251,226,167,0.25)",
+                color: "#fbe2a7",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(251,226,167,0.14)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = showBuyLinks ? "rgba(251,226,167,0.14)" : "rgba(251,226,167,0.07)"; }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+              </svg>
+              Order online
+            </button>
+          )}
           <button
-            onClick={() => setShowComingSoon(true)}
+            onClick={() => setShowNearby((v) => !v)}
             className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-full transition-all"
             style={{
-              background: "rgba(74,222,128,0.07)",
-              border: "1px solid rgba(74,222,128,0.2)",
-              color: "#4ade80",
+              background: showNearby ? "rgba(168,190,201,0.14)" : "rgba(168,190,201,0.07)",
+              border: "1px solid rgba(168,190,201,0.25)",
+              color: "#a8bec9",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.13)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.07)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(168,190,201,0.14)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = showNearby ? "rgba(168,190,201,0.14)" : "rgba(168,190,201,0.07)"; }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
             </svg>
-            Ask a pharmacist
+            Nearby
           </button>
+          {onAskPharmacist && (
+            <button
+              onClick={() => setShowComingSoon(true)}
+              className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-full transition-all"
+              style={{
+                background: "rgba(74,222,128,0.07)",
+                border: "1px solid rgba(74,222,128,0.2)",
+                color: "#4ade80",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.13)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.07)"; }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              Ask a pharmacist
+            </button>
+          )}
         </div>
       )}
 
