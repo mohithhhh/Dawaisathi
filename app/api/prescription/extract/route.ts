@@ -63,6 +63,7 @@ Rules:
       handwritten: !!parsed.handwritten,
     });
   } catch (error) {
+
     console.error("Prescription extract error:", error);
     return NextResponse.json(
       { error: "Failed to read prescription. Please try again." },

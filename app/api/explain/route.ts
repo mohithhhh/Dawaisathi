@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import type { Language } from "@/types";
+import { FREE_TIER_LIMIT } from "@/types";
 import { geminiExplain, geminiTranslate, geminiPost } from "@/lib/ai";
 
 async function geminiOCR(imageBase64: string, mimeType: string): Promise<string> {
@@ -62,6 +64,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── Auth + plan check ─────────────────────────────────────────────────────
+    // anon client with session cookies — used only for auth.getUser()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return request.cookies.getAll(); },
+          setAll() {},
+        },
+      }
+    );
+    // service-role client — bypasses RLS for trusted server-side writes
+    const supabaseAdmin = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { cookies: { getAll: () => [], setAll: () => {} } }
+    );
+
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase
+      .from("users")
+      .select("plan, explanation_count, subscription_end")
+      .eq("id", authUser.id)
+      .single();
+
+    const now = new Date();
+    const subscriptionActive =
+      profile?.plan === "subscription" &&
+      profile.subscription_end != null &&
+      new Date(profile.subscription_end) > now;
+    const canExplain =
+      subscriptionActive ||
+      profile?.plan === "paid" ||
+      (profile?.explanation_count ?? 0) < FREE_TIER_LIMIT;
+
+    if (!canExplain) {
+      return NextResponse.json({ error: "Free limit reached. Please upgrade." }, { status: 402 });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const body = await request.json();
     const { medicine_name, language, image_base64, image_media_type }: {
       medicine_name?: string;
@@ -111,7 +158,28 @@ export async function POST(request: NextRequest) {
 
           const fullExplanation = await geminiTranslate(englishExplanation, language);
           send(`data: ${JSON.stringify({ type: "text", text: fullExplanation })}\n\n`);
-          send(`data: ${JSON.stringify({ type: "done", usage_count: null, plan: "free" })}\n\n`);
+
+          // Update usage + save explanation (awaited so client re-fetch sees fresh data)
+          const currentPlan = profile?.plan ?? "free";
+          const currentCount = profile?.explanation_count ?? 0;
+          // Upsert users row first (FK dependency), then insert explanation
+          if (currentPlan === "free") {
+            const { error: upsertErr } = await supabaseAdmin.from("users").upsert(
+              { id: authUser.id, plan: "free", explanation_count: currentCount + 1 },
+              { onConflict: "id" }
+            );
+            if (upsertErr) console.error("User upsert failed:", upsertErr);
+          }
+          const { error: explainErr } = await supabaseAdmin.from("explanations").insert({
+            user_id: authUser.id,
+            medicine_name: finalMedicineName,
+            language,
+            explanation_text: fullExplanation,
+          });
+          if (explainErr) console.error("Explanation insert failed:", explainErr);
+
+          const newCount = currentPlan === "free" ? currentCount + 1 : currentCount;
+          send(`data: ${JSON.stringify({ type: "done", usage_count: newCount, plan: currentPlan })}\n\n`);
           controller.close();
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unknown error";
@@ -129,6 +197,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+
     console.error("Explain API error:", error);
     return NextResponse.json(
       { error: "Internal server error. Please try again." },

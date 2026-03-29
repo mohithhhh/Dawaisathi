@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { UserProfile } from "@/types";
+import { track } from "@/lib/posthog";
 
 interface PaywallModalProps {
   onClose: () => void;
@@ -138,6 +139,7 @@ export default function PaywallModal({
       };
 
       const rzp = new window.Razorpay(options);
+      track("payment_initiated", { amount: orderData.amount / 100, type: payment_type });
       rzp.open();
     } catch {
       setError("Something went wrong. Please try again.");

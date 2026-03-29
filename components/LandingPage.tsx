@@ -732,9 +732,16 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           <span className="text-xs" style={{ color: "#4a6a7a" }}>— Medicine Companion</span>
         </div>
 
-        <p className="text-xs text-center" style={{ color: "#4a6a7a" }}>
-          For information only — not medical advice. Always consult your doctor.
-        </p>
+        <div className="text-xs text-center space-y-1.5" style={{ color: "#4a6a7a" }}>
+          <p>For information only — not medical advice. Always consult your doctor.</p>
+          <p>
+            <a href="/privacy" className="hover:opacity-80 transition-opacity">Privacy</a>
+            {" · "}
+            <a href="/terms" className="hover:opacity-80 transition-opacity">Terms</a>
+            {" · "}
+            <a href="/disclaimer" className="hover:opacity-80 transition-opacity">Disclaimer</a>
+          </p>
+        </div>
 
         <p className="text-xs" style={{ color: "#4a6a7a" }}>Made for India</p>
       </footer>

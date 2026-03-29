@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { createClient } from "@/lib/supabase";
 
 interface AuthModalProps {
@@ -9,20 +10,22 @@ interface AuthModalProps {
 
 export default function AuthModal({ onClose }: AuthModalProps) {
   const supabase = createClient();
+  const [phone, setPhone] = useState("");
 
   const handleGoogleSignIn = async () => {
+    if (!phone.trim()) return;
+    localStorage.setItem("pendingPhone", "+91" + phone.trim());
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
   };
+
+  const isValid = phone.trim().length === 10;
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-surface border border-border rounded-2xl w-full max-w-sm p-6 animate-slide-up">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-text-primary font-semibold text-lg">Sign in</h2>
@@ -36,9 +39,29 @@ export default function AuthModal({ onClose }: AuthModalProps) {
           </button>
         </div>
 
+        <div className="mb-4">
+          <label className="block text-text-secondary text-sm mb-1.5">
+            Mobile number <span className="text-red-400">*</span>
+          </label>
+          <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-xl px-3 py-2.5">
+            <span className="text-text-secondary text-sm select-none">+91</span>
+            <input
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              placeholder="9876543210"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+              className="flex-1 bg-transparent text-text-primary text-sm outline-none placeholder:text-muted"
+            />
+          </div>
+          <p className="text-muted text-xs mt-1">Required for pharmacist callbacks</p>
+        </div>
+
         <button
           onClick={handleGoogleSignIn}
-          className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-medium py-3 rounded-xl hover:bg-gray-50 transition-all"
+          disabled={!isValid}
+          className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-medium py-3 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -50,7 +73,8 @@ export default function AuthModal({ onClose }: AuthModalProps) {
         </button>
 
         <p className="text-muted text-xs text-center mt-4">
-          By continuing, you agree to our terms of service
+          By continuing, you agree to our{" "}
+          <a href="/terms" className="underline">terms of service</a>
         </p>
       </div>
     </div>
