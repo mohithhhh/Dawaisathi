@@ -4,6 +4,7 @@ import type { Language } from "@/types";
 import { FREE_TIER_LIMIT } from "@/types";
 import { geminiExplain, geminiTranslate, geminiPost, extractGenericName } from "@/lib/ai";
 import { matchJanaushadhi } from "@/lib/janaushadhi";
+import * as Sentry from "@sentry/nextjs";
 
 async function geminiOCR(imageBase64: string, mimeType: string): Promise<string> {
   const DOSAGE_PATTERN = /\b\d+\s*(mg|ml|mcg|iu|g|%)\b|\b(tab\.?|cap\.?|syp\.?|inj\.?|oint\.?|susp\.?|tablet|capsule|syrup|injection|cream|drops?|patch|lotion)\b/gi;
@@ -206,6 +207,7 @@ export async function POST(request: NextRequest) {
           controller.close();
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unknown error";
+          Sentry.captureException(error, { extra: { medicine_name: finalMedicineName, language } });
           send(`data: ${JSON.stringify({ type: "error", error: message })}\n\n`);
           controller.close();
         }
@@ -220,8 +222,8 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-
     console.error("Explain API error:", error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { error: "Internal server error. Please try again." },
       { status: 500 }
