@@ -4,10 +4,17 @@ import { useState, useRef, useEffect } from "react";
 import type { Language } from "@/types";
 import BuyMedicineLinks from "@/components/BuyMedicineLinks";
 import NearbyHelp from "@/components/NearbyHelp";
+import JanaushadhiMatch from "@/components/JanaushadhiMatch";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+}
+
+interface JanaushadhiProductInfo {
+  generic_name: string;
+  unit_size: string;
+  mrp: number;
 }
 
 interface ChatInterfaceProps {
@@ -15,6 +22,7 @@ interface ChatInterfaceProps {
   initialMessages?: Message[];
   medicineName?: string;
   onAskPharmacist?: () => void;
+  janaushadhiMatch?: JanaushadhiProductInfo | null;
 }
 
 function renderContent(content: string) {
@@ -58,7 +66,7 @@ function AssistantAvatar() {
   );
 }
 
-export default function ChatInterface({ language, initialMessages = [], medicineName, onAskPharmacist }: ChatInterfaceProps) {
+export default function ChatInterface({ language, initialMessages = [], medicineName, onAskPharmacist, janaushadhiMatch }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -66,6 +74,7 @@ export default function ChatInterface({ language, initialMessages = [], medicine
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [showBuyLinks, setShowBuyLinks] = useState(false);
   const [showNearby, setShowNearby] = useState(false);
+  const [showJanaushadhi, setShowJanaushadhi] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -259,6 +268,17 @@ export default function ChatInterface({ language, initialMessages = [], medicine
         )}
       </div>
 
+      {/* Jan Aushadhi generic match inline — shown when toggled */}
+      {showJanaushadhi && janaushadhiMatch && (
+        <div className="pt-2 pb-1">
+          <JanaushadhiMatch
+            genericName={janaushadhiMatch.generic_name}
+            unitSize={janaushadhiMatch.unit_size}
+            mrp={janaushadhiMatch.mrp}
+          />
+        </div>
+      )}
+
       {/* Nearby inline — shown when toggled */}
       {showNearby && (
         <div className="pt-2 pb-1">
@@ -325,6 +345,26 @@ export default function ChatInterface({ language, initialMessages = [], medicine
                 <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
               </svg>
               Order online
+            </button>
+          )}
+          {janaushadhiMatch && (
+            <button
+              onClick={() => setShowJanaushadhi((v) => !v)}
+              className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-full transition-all"
+              style={{
+                background: showJanaushadhi ? "rgba(74,222,128,0.14)" : "rgba(74,222,128,0.07)",
+                border: "1px solid rgba(74,222,128,0.25)",
+                color: "#4ade80",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.14)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = showJanaushadhi ? "rgba(74,222,128,0.14)" : "rgba(74,222,128,0.07)"; }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z" />
+                <line x1="16" y1="8" x2="2" y2="22" />
+                <line x1="17.5" y1="15" x2="9" y2="15" />
+              </svg>
+              Cheaper generic
             </button>
           )}
           <button

@@ -24,6 +24,7 @@ function toTitleCase(s: string) {
 }
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
+type JanaushadhiProductInfo = { generic_name: string; unit_size: string; mrp: number };
 
 // ─── Pharmacist Payment Modal ─────────────────────────────────────────────────
 function PharmacistPaymentModal({
@@ -192,6 +193,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
   // Chat state
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
+  const [janaushadhiMatch, setJanaushadhiMatch] = useState<JanaushadhiProductInfo | null>(null);
   const explanationAccum = useRef("");
 
   // Free query counter
@@ -300,6 +302,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
   const handleSearchAgain = () => {
     setShowChat(false);
     setChatMessages([]);
+    setJanaushadhiMatch(null);
     setExtractedMedicine("");
     setMedicineName("");
     setImageBase64("");
@@ -321,6 +324,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
 
     setError("");
     setExtractedMedicine("");
+    setJanaushadhiMatch(null);
     explanationAccum.current = "";
     setIsLoading(true);
 
@@ -366,6 +370,8 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
             if (data.type === "medicine_name") {
               setExtractedMedicine(data.medicine_name);
               if (!medicineName && data.medicine_name) setMedicineName(data.medicine_name);
+            } else if (data.type === "janaushadhi_match") {
+              setJanaushadhiMatch(data.product);
             } else if (data.type === "text") {
               explanationAccum.current += data.text;
             } else if (data.type === "done") {
@@ -616,6 +622,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
                 language={language}
                 initialMessages={chatMessages}
                 medicineName={displayMedicine}
+                janaushadhiMatch={janaushadhiMatch}
                 onAskPharmacist={() => {
                   track("pharmacist_requested", { language, medicine: displayMedicine });
                   if (!user) { setShowAuth(true); }

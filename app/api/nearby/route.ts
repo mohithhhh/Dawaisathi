@@ -23,8 +23,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing params" }, { status: 400 });
   }
 
+  // "janaushadhi" isn't a Google Places `type` category — Jan Aushadhi Kendras
+  // (government generic-medicine stores) are found via keyword search instead,
+  // with a wider radius since they're sparser than regular pharmacies.
+  const isKendra = type === "janaushadhi";
+  const params = new URLSearchParams({
+    location: `${lat},${lng}`,
+    radius: isKendra ? "20000" : "10000",
+    key: apiKey,
+  });
+  if (isKendra) {
+    params.set("keyword", "Jan Aushadhi Kendra");
+  } else {
+    params.set("type", type);
+  }
+
   const res = await fetch(
-    `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=10000&type=${type}&key=${apiKey}`
+    `https://maps.googleapis.com/maps/api/place/nearbysearch/json?${params.toString()}`
   );
   const data = await res.json();
   console.log("[nearby] Places API status:", data.status, "| results:", data.results?.length ?? 0, "| error:", data.error_message ?? "none");
