@@ -303,6 +303,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
     setShowChat(false);
     setChatMessages([]);
     setJanaushadhiMatch(null);
+    setPharmacistRequested(false);
     setExtractedMedicine("");
     setMedicineName("");
     setImageBase64("");
@@ -623,6 +624,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
                 initialMessages={chatMessages}
                 medicineName={displayMedicine}
                 janaushadhiMatch={janaushadhiMatch}
+                pharmacistRequested={pharmacistRequested}
                 onAskPharmacist={() => {
                   track("pharmacist_requested", { language, medicine: displayMedicine });
                   if (!user) { setShowAuth(true); }

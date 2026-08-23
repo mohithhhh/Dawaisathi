@@ -22,6 +22,7 @@ interface ChatInterfaceProps {
   initialMessages?: Message[];
   medicineName?: string;
   onAskPharmacist?: () => void;
+  pharmacistRequested?: boolean;
   janaushadhiMatch?: JanaushadhiProductInfo | null;
 }
 
@@ -66,12 +67,11 @@ function AssistantAvatar() {
   );
 }
 
-export default function ChatInterface({ language, initialMessages = [], medicineName, onAskPharmacist, janaushadhiMatch }: ChatInterfaceProps) {
+export default function ChatInterface({ language, initialMessages = [], medicineName, onAskPharmacist, pharmacistRequested, janaushadhiMatch }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState("");
-  const [showComingSoon, setShowComingSoon] = useState(false);
   const [showBuyLinks, setShowBuyLinks] = useState(false);
   const [showNearby, setShowNearby] = useState(false);
   const [showJanaushadhi, setShowJanaushadhi] = useState(false);
@@ -386,44 +386,29 @@ export default function ChatInterface({ language, initialMessages = [], medicine
           </button>
           {onAskPharmacist && (
             <button
-              onClick={() => setShowComingSoon(true)}
-              className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-full transition-all"
+              onClick={pharmacistRequested ? undefined : onAskPharmacist}
+              disabled={pharmacistRequested}
+              className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-full transition-all disabled:cursor-default"
               style={{
-                background: "rgba(74,222,128,0.07)",
+                background: pharmacistRequested ? "rgba(74,222,128,0.14)" : "rgba(74,222,128,0.07)",
                 border: "1px solid rgba(74,222,128,0.2)",
                 color: "#4ade80",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.13)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.07)"; }}
+              onMouseEnter={(e) => { if (!pharmacistRequested) e.currentTarget.style.background = "rgba(74,222,128,0.13)"; }}
+              onMouseLeave={(e) => { if (!pharmacistRequested) e.currentTarget.style.background = "rgba(74,222,128,0.07)"; }}
             >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-              Ask a pharmacist
+              {pharmacistRequested ? (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+              )}
+              {pharmacistRequested ? "Callback requested" : "Ask a pharmacist"}
             </button>
           )}
-        </div>
-      )}
-
-      {/* Coming Soon modal */}
-      {showComingSoon && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowComingSoon(false)}>
-          <div className="rounded-2xl p-8 max-w-sm w-full text-center" style={{ background: "#12242e", border: "1px solid rgba(255,255,255,0.08)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-center mb-4">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fbe2a7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
-            </div>
-            <h3 className="font-bold text-lg mb-2" style={{ color: "#f0f8ff" }}>Coming Soon</h3>
-            <p className="text-sm mb-6" style={{ color: "#a8bec9" }}>
-              Connect with a real pharmacist for personalised guidance. We're working on it!
-            </p>
-            <button
-              onClick={() => setShowComingSoon(false)}
-              className="px-6 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95"
-              style={{ background: "rgba(251,226,167,0.12)", color: "#fbe2a7", border: "1px solid rgba(251,226,167,0.2)" }}
-            >
-              Got it
-            </button>
-          </div>
         </div>
       )}
 
