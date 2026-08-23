@@ -13,11 +13,8 @@ import UsageBar from "@/components/UsageBar";
 import LandingPage from "@/components/LandingPage";
 import PrescriptionTab from "@/components/PrescriptionTab";
 import type { Language, UserProfile } from "@/types";
-import { FREE_TIER_LIMIT, LANGUAGE_LABELS } from "@/types";
+import { LANGUAGE_LABELS } from "@/types";
 import { track } from "@/lib/posthog";
-
-
-const FREE_STORAGE_KEY = "dw_free_count";
 
 function toTitleCase(s: string) {
   return s.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
@@ -195,13 +192,6 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [janaushadhiMatch, setJanaushadhiMatch] = useState<JanaushadhiProductInfo | null>(null);
   const explanationAccum = useRef("");
-
-  // Free query counter
-  const [freeCount, setFreeCount] = useState(FREE_TIER_LIMIT);
-  useEffect(() => {
-    const saved = localStorage.getItem(FREE_STORAGE_KEY);
-    if (saved !== null) setFreeCount(parseInt(saved, 10));
-  }, []);
 
   // Auto-scroll to chat when it appears
   const chatRef = useRef<HTMLDivElement>(null);

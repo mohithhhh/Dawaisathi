@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Language } from "@/types";
-import { FREE_TIER_LIMIT } from "@/types";
 import { geminiExplain, geminiTranslate, geminiPost, extractGenericName } from "@/lib/ai";
 import { matchJanaushadhi } from "@/lib/janaushadhi";
 import * as Sentry from "@sentry/nextjs";
@@ -90,25 +89,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     }
 
+    // Explanations are free and unlimited — no quota gate. explanation_count
+    // is still tracked below (history/analytics), and the paid plan machinery
+    // (Razorpay one_time/subscription, plan column, PaywallModal) stays in
+    // place but unused by this route — monetization is the pharmacist
+    // callback (see /api/payment/verify, payment_type: "pharmacist"), not
+    // access to explanations.
     const { data: profile } = await supabase
       .from("users")
       .select("plan, explanation_count, subscription_end")
       .eq("id", authUser.id)
       .single();
-
-    const now = new Date();
-    const subscriptionActive =
-      profile?.plan === "subscription" &&
-      profile.subscription_end != null &&
-      new Date(profile.subscription_end) > now;
-    const canExplain =
-      subscriptionActive ||
-      profile?.plan === "paid" ||
-      (profile?.explanation_count ?? 0) < FREE_TIER_LIMIT;
-
-    if (!canExplain) {
-      return NextResponse.json({ error: "Free limit reached. Please upgrade." }, { status: 402 });
-    }
     // ─────────────────────────────────────────────────────────────────────────
 
     const body = await request.json();

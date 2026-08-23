@@ -107,37 +107,28 @@ const FEATURES = [
   { title: "Under 10 Seconds", desc: "No waiting. Advanced AI delivers plain-language explanations instantly." },
   { title: "Medicine Chat", desc: "Ask follow-up questions in a friendly conversational interface." },
   { title: "Private & Secure", desc: "Your queries are processed securely. We never sell your data." },
-  { title: "Free to Start", desc: "3 free explanations. No account, no credit card — start immediately." },
+  { title: "Free to Start", desc: "Unlimited explanations, always free. No account, no credit card — start immediately." },
 ];
 
 
 const PRICING = [
   {
-    label: "Free",
+    label: "Explanations",
     price: "₹0",
-    period: "forever",
+    period: "forever, unlimited",
     highlight: false,
     tag: null,
-    features: ["3 free explanations", "All 11 languages", "Photo scan", "No signup needed"],
+    features: ["Unlimited explanations", "All 11 languages", "Photo scan", "Medicine chat", "No signup needed to try"],
     cta: "Try for Free",
   },
   {
-    label: "Pay as you go",
-    price: "₹20",
-    period: "one-time",
+    label: "Talk to a Pharmacist",
+    price: "₹50",
+    period: "per callback",
     highlight: true,
-    tag: "Most Popular",
-    features: ["Unlimited explanations", "All 11 languages", "Photo scan", "Medicine chat", "Explanation history"],
+    tag: "Real Pharmacist",
+    features: ["Certified pharmacist calls you back", "Personalised guidance for your case", "No travel needed", "Usually within 30 minutes"],
     cta: "Get Started",
-  },
-  {
-    label: "Monthly",
-    price: "₹99",
-    period: "per month",
-    highlight: false,
-    tag: null,
-    features: ["Everything in Pay as you go", "Priority AI processing", "Early access to new features"],
-    cta: "Subscribe",
   },
 ];
 
@@ -391,7 +382,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             <span style={{ opacity: 0.6 }}>→</span>
           </button>
 
-          <p className="text-xs" style={{ color: "#6b8a9a" }}>3 free explanations · No signup needed</p>
+          <p className="text-xs" style={{ color: "#6b8a9a" }}>Free, unlimited explanations · No signup needed</p>
         </main>
 
       </section>
@@ -608,10 +599,10 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             <h2 className="font-bold mb-4" style={{ fontSize: "clamp(1.8rem, 4vw, 2.8rem)" }}>
               Honest, simple pricing
             </h2>
-            <p style={{ color: "#a8bec9" }}>Start free. Pay only when you need more.</p>
+            <p style={{ color: "#a8bec9" }}>Explanations are free, always. Pay only if you want a real pharmacist on the phone.</p>
           </div>
 
-          <div className="grid sm:grid-cols-3 gap-5">
+          <div className="grid sm:grid-cols-2 gap-5 max-w-2xl mx-auto">
             {PRICING.map((plan, i) => (
               <div
                 key={plan.label}
@@ -715,7 +706,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             <span style={{ opacity: 0.6 }}>→</span>
           </button>
           <p className="mt-4 text-xs" style={{ color: "#6b8a9a" }}>
-            3 free explanations · No signup · Works instantly
+            Free, unlimited explanations · No signup · Works instantly
           </p>
         </div>
       </section>
