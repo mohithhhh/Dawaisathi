@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Language } from "@/types";
 import { FREE_TIER_LIMIT } from "@/types";
-import { geminiExplain, geminiTranslate, geminiPost } from "@/lib/ai";
+import { geminiExplain, geminiTranslate, geminiPost, extractGenericName } from "@/lib/ai";
+import { matchJanaushadhi } from "@/lib/janaushadhi";
 
 async function geminiOCR(imageBase64: string, mimeType: string): Promise<string> {
   const DOSAGE_PATTERN = /\b\d+\s*(mg|ml|mcg|iu|g|%)\b|\b(tab\.?|cap\.?|syp\.?|inj\.?|oint\.?|susp\.?|tablet|capsule|syrup|injection|cream|drops?|patch|lotion)\b/gi;
@@ -149,11 +150,33 @@ export async function POST(request: NextRequest) {
         try {
           send(`data: ${JSON.stringify({ type: "medicine_name", medicine_name: finalMedicineName })}\n\n`);
 
-          const englishExplanation = await geminiExplain(finalMedicineName!);
-          if (!englishExplanation) {
+          const rawExplanation = await geminiExplain(finalMedicineName!);
+          if (!rawExplanation) {
             send(`data: ${JSON.stringify({ type: "error", error: "Could not generate explanation. Please try again." })}\n\n`);
             controller.close();
             return;
+          }
+          const { genericName, explanation: englishExplanation } = extractGenericName(rawExplanation);
+
+          // Best-effort Jan Aushadhi generic-price lookup — prefer the generic
+          // name Gemini just resolved (handles brand names like "Dolo 650"
+          // correctly); fall back to the raw input if that failed. Never let
+          // a matching problem break the explanation itself.
+          try {
+            const [best] = matchJanaushadhi(genericName || finalMedicineName!, 1, 0.5);
+            if (best) {
+              send(`data: ${JSON.stringify({
+                type: "janaushadhi_match",
+                product: {
+                  generic_name: best.product.generic_name,
+                  unit_size: best.product.unit_size,
+                  mrp: best.product.mrp,
+                },
+                score: best.score,
+              })}\n\n`);
+            }
+          } catch (matchError) {
+            console.error("Janaushadhi match failed:", matchError);
           }
 
           const fullExplanation = await geminiTranslate(englishExplanation, language);

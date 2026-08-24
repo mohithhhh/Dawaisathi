@@ -19,7 +19,11 @@ export function buildExplainPrompt(medicineName: string): string {
 
 Medicine: ${medicineName}
 
-Explain this medicine in English using exactly this structure:
+First, on its own line, output the generic / active-ingredient name (this line is used internally for price lookup and is stripped before the patient sees anything — it is not part of the explanation):
+GENERIC: <generic/active ingredient name only, no dosage, no brand name>
+If you genuinely cannot determine it, write GENERIC: UNKNOWN
+
+Then, after a blank line, explain this medicine in English using exactly this structure:
 
 **What is this medicine?**
 What condition this treats — one simple sentence.
@@ -82,6 +86,25 @@ export async function geminiExplain(medicineName: string): Promise<string> {
   if (!res.ok) throw new Error(`Gemini explain failed: ${res.status}`);
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+}
+
+// Pulls the leading "GENERIC: <name>" line back out of geminiExplain's raw
+// output — see buildExplainPrompt. Returns the generic name (for Jan Aushadhi
+// matching, see lib/janaushadhi.ts) and the explanation text with that line
+// removed, ready to translate/display. Never throws: a missing or malformed
+// GENERIC line just means no generic name, not a broken explanation.
+export function extractGenericName(rawExplanation: string): {
+  genericName: string | null;
+  explanation: string;
+} {
+  const match = rawExplanation.match(/^GENERIC:\s*(.*?)\s*\n+/i);
+  if (!match) return { genericName: null, explanation: rawExplanation.trim() };
+  const generic = match[1].trim();
+  const explanation = rawExplanation.slice(match[0].length).trim();
+  return {
+    genericName: generic && generic.toUpperCase() !== "UNKNOWN" ? generic : null,
+    explanation,
+  };
 }
 
 export async function geminiTranslate(text: string, targetLanguage: Language): Promise<string> {

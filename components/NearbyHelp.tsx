@@ -2,8 +2,20 @@
 
 import { useState, useEffect } from "react";
 
-type Tab = "pharmacy" | "doctor";
+type Tab = "pharmacy" | "doctor" | "janaushadhi";
 type Status = "idle" | "requesting" | "granted" | "denied";
+
+const TAB_LABELS: Record<Tab, string> = {
+  pharmacy: "Pharmacies",
+  doctor: "Doctors",
+  janaushadhi: "Jan Aushadhi",
+};
+
+const TAB_RESULT_LABELS: Record<Tab, string> = {
+  pharmacy: "pharmacies",
+  doctor: "doctors",
+  janaushadhi: "Jan Aushadhi Kendras",
+};
 
 interface Place {
   name: string;
@@ -18,7 +30,7 @@ export default function NearbyHelp() {
   const [status, setStatus] = useState<Status>("idle");
   const [activeTab, setActiveTab] = useState<Tab>("pharmacy");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [results, setResults] = useState<Record<Tab, Place[] | null>>({ pharmacy: null, doctor: null });
+  const [results, setResults] = useState<Record<Tab, Place[] | null>>({ pharmacy: null, doctor: null, janaushadhi: null });
   const [fetching, setFetching] = useState(false);
 
   useEffect(() => {
@@ -72,7 +84,7 @@ export default function NearbyHelp() {
     }
   };
 
-  const tabLabel = activeTab === "pharmacy" ? "pharmacies" : "doctors";
+  const tabLabel = TAB_RESULT_LABELS[activeTab];
 
   return (
     <div className="rounded-2xl p-4" style={{ background: "#12242e", border: "1px solid rgba(255,255,255,0.07)" }}>
@@ -87,7 +99,7 @@ export default function NearbyHelp() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-3 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)" }}>
-        {(["pharmacy", "doctor"] as Tab[]).map((tab) => (
+        {(["pharmacy", "doctor", "janaushadhi"] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => handleTabClick(tab)}
@@ -98,7 +110,7 @@ export default function NearbyHelp() {
                 : { color: "#6b8a9a" }
             }
           >
-            {tab === "pharmacy" ? "Pharmacies" : "Doctors"}
+            {TAB_LABELS[tab]}
           </button>
         ))}
       </div>
@@ -132,7 +144,7 @@ export default function NearbyHelp() {
             </div>
           ) : results[activeTab]?.length === 0 ? (
             <p className="text-xs text-center py-2" style={{ color: "#6b8a9a" }}>
-              No {tabLabel} found within 10 km
+              No {tabLabel} found within {activeTab === "janaushadhi" ? "20" : "10"} km
             </p>
           ) : (
             <div className="flex flex-col gap-2">
