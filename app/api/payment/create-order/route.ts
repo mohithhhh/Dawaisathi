@@ -1,5 +1,6 @@
 import Razorpay from "razorpay";
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 
 const PRICES: Record<string, number> = {
   one_time: 2000,     // ₹20 in paise
@@ -37,8 +38,8 @@ export async function POST(request: NextRequest) {
       key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
     });
   } catch (error) {
-
     console.error("Create order error:", error);
+    Sentry.captureException(error);
     return NextResponse.json({ error: "Failed to create payment order" }, { status: 500 });
   }
 }

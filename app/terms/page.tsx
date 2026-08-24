@@ -49,11 +49,10 @@ export default function TermsPage() {
           <section>
             <h2 className="text-base font-semibold mb-3" style={{ color: "#f0f8ff" }}>5. Payment Terms</h2>
             <ul className="list-disc pl-5 space-y-2">
-              <li>The Service offers 3 free medicine explanations per account.</li>
-              <li>Additional explanations require a one-time payment of ₹20 per explanation or a monthly subscription of ₹99.</li>
-              <li><strong style={{ color: "#f0f8ff" }}>No refunds on digital content.</strong> Once an AI explanation is generated and delivered, the transaction is final and non-refundable.</li>
+              <li>AI-generated medicine explanations are free and unlimited for all users.</li>
+              <li>Connecting with a certified pharmacist for a personal callback is a paid feature, priced at ₹50 per request.</li>
+              <li><strong style={{ color: "#f0f8ff" }}>No refunds on completed services.</strong> Once a pharmacist callback has been fulfilled, the transaction is final and non-refundable.</li>
               <li>Payments are processed securely via Razorpay. We do not store payment card information.</li>
-              <li>Subscription plans auto-renew monthly. You may cancel at any time.</li>
             </ul>
           </section>
 

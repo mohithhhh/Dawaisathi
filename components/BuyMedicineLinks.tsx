@@ -1,27 +1,53 @@
 "use client";
 
+import { track } from "@/lib/posthog";
+
 interface Props {
   medicineName: string;
 }
 
+// Per-store affiliate deep-link templates. Each network (1mg/PharmEasy run
+// via Admitad or Impact, Apollo/Netmeds typically via vCommission) issues its
+// own click-tracking URL format once you're approved — there's no universal
+// "?aff_id=" param, so this can't be filled in without actually signing up
+// for each program and copying the template they give you. Set the env var
+// with `{url}` where the destination link should be substituted, e.g.:
+//   NEXT_PUBLIC_AFFILIATE_URL_1MG="https://prf.hn/click/camref:xxxx/destination:{url}"
+// Until each is set, that store falls back to a plain link with UTM params —
+// so click-through is still visible in PostHog even before any affiliate
+// deal exists, and turning on real monetization later is a config change,
+// not a code change.
+const AFFILIATE_TEMPLATES: Record<string, string | undefined> = {
+  "1mg": process.env.NEXT_PUBLIC_AFFILIATE_URL_1MG,
+  PharmEasy: process.env.NEXT_PUBLIC_AFFILIATE_URL_PHARMEASY,
+  Apollo: process.env.NEXT_PUBLIC_AFFILIATE_URL_APOLLO,
+  Netmeds: process.env.NEXT_PUBLIC_AFFILIATE_URL_NETMEDS,
+};
+
 const STORES = [
   {
     name: "1mg",
-    url: (e: string) => `https://www.1mg.com/search/all?name=${e}`,
+    plainUrl: (e: string) => `https://www.1mg.com/search/all?name=${e}&utm_source=dawaisathi&utm_medium=app&utm_campaign=order_online`,
   },
   {
     name: "PharmEasy",
-    url: (e: string) => `https://pharmeasy.in/search/all?name=${e}`,
+    plainUrl: (e: string) => `https://pharmeasy.in/search/all?name=${e}&utm_source=dawaisathi&utm_medium=app&utm_campaign=order_online`,
   },
   {
     name: "Apollo",
-    url: (e: string) => `https://www.apollopharmacy.in/search-medicines/${e}`,
+    plainUrl: (e: string) => `https://www.apollopharmacy.in/search-medicines/${e}?utm_source=dawaisathi&utm_medium=app&utm_campaign=order_online`,
   },
   {
     name: "Netmeds",
-    url: (e: string) => `https://www.netmeds.com/catalogsearch/result?q=${e}`,
+    plainUrl: (e: string) => `https://www.netmeds.com/catalogsearch/result?q=${e}&utm_source=dawaisathi&utm_medium=app&utm_campaign=order_online`,
   },
 ];
+
+function buildHref(storeName: string, plainUrl: string): { href: string; monetized: boolean } {
+  const template = AFFILIATE_TEMPLATES[storeName];
+  if (!template) return { href: plainUrl, monetized: false };
+  return { href: template.replace("{url}", encodeURIComponent(plainUrl)), monetized: true };
+}
 
 export default function BuyMedicineLinks({ medicineName }: Props) {
   const encoded = encodeURIComponent(medicineName);
@@ -38,22 +64,26 @@ export default function BuyMedicineLinks({ medicineName }: Props) {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        {STORES.map((store) => (
-          <a
-            key={store.name}
-            href={store.url(encoded)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex flex-col items-center py-3 rounded-xl transition-all hover:opacity-80"
-            style={{
-              border: "1px solid rgba(251,226,167,0.3)",
-              background: "rgba(251,226,167,0.04)",
-            }}
-          >
-            <span className="text-sm font-semibold" style={{ color: "#fbe2a7" }}>{store.name}</span>
-            <span className="text-xs mt-0.5" style={{ color: "rgba(251,226,167,0.5)" }}>₹ Check price</span>
-          </a>
-        ))}
+        {STORES.map((store) => {
+          const { href, monetized } = buildHref(store.name, store.plainUrl(encoded));
+          return (
+            <a
+              key={store.name}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              onClick={() => track("buy_link_clicked", { store: store.name, medicine: medicineName, monetized })}
+              className="flex flex-col items-center py-3 rounded-xl transition-all hover:opacity-80"
+              style={{
+                border: "1px solid rgba(251,226,167,0.3)",
+                background: "rgba(251,226,167,0.04)",
+              }}
+            >
+              <span className="text-sm font-semibold" style={{ color: "#fbe2a7" }}>{store.name}</span>
+              <span className="text-xs mt-0.5" style={{ color: "rgba(251,226,167,0.5)" }}>₹ Check price</span>
+            </a>
+          );
+        })}
       </div>
 
       <p className="mt-3 text-xs" style={{ color: "#6b8a9a" }}>
