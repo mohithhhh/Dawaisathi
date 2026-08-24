@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { UserProfile } from "@/types";
+import { track } from "@/lib/posthog";
 
 interface PaywallModalProps {
   onClose: () => void;
@@ -138,6 +139,7 @@ export default function PaywallModal({
       };
 
       const rzp = new window.Razorpay(options);
+      track("payment_initiated", { amount: orderData.amount / 100, type: payment_type });
       rzp.open();
     } catch {
       setError("Something went wrong. Please try again.");
@@ -177,7 +179,7 @@ export default function PaywallModal({
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">🔓</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
                   <span className="text-text-primary font-semibold">
                     Single Consultation
                   </span>
@@ -211,7 +213,7 @@ export default function PaywallModal({
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">♾️</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 12c-2-2.5-4-4-6-4a4 4 0 0 0 0 8c2 0 4-1.5 6-4zm0 0c2 2.5 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.5-6 4z"/></svg>
                   <span className="text-text-primary font-semibold">
                     Monthly Unlimited
                   </span>
@@ -241,7 +243,7 @@ export default function PaywallModal({
         )}
 
         <p className="text-muted text-xs text-center mt-4">
-          🔒 Secure payment via Razorpay • UPI, Cards, Net Banking accepted
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-1"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Secure payment via Razorpay • UPI, Cards, Net Banking accepted
         </p>
       </div>
     </div>

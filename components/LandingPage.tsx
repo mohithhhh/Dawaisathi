@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
+import AuthModal from "@/components/AuthModal";
 
 // ─── Scroll Reveal ─────────────────────────────────────────────────────────────
 function useScrollReveal() {
@@ -106,57 +107,28 @@ const FEATURES = [
   { title: "Under 10 Seconds", desc: "No waiting. Advanced AI delivers plain-language explanations instantly." },
   { title: "Medicine Chat", desc: "Ask follow-up questions in a friendly conversational interface." },
   { title: "Private & Secure", desc: "Your queries are processed securely. We never sell your data." },
-  { title: "Free to Start", desc: "3 free explanations. No account, no credit card — start immediately." },
+  { title: "Free to Start", desc: "Unlimited explanations, always free. No account, no credit card — start immediately." },
 ];
 
-const TESTIMONIALS = [
-  {
-    name: "Rajesh Kumar",
-    city: "Patna, Bihar",
-    lang: "हिंदी",
-    quote: "\"पहले दवाई का पर्चा समझ नहीं आता था। अब DawaiSathi से हिंदी में सब कुछ साफ़ समझ आ जाता है।\"",
-  },
-  {
-    name: "Lakshmi Nair",
-    city: "Thiruvananthapuram, Kerala",
-    lang: "മലയാളം",
-    quote: "\"ഇനി ഡോക്ടറോട് ആവർത്തിച്ചു ചോദിക്കേണ്ടതില്ല. ഫോണിൽ ഫോട്ടോ എടുത്ത് ഉടൻ മനസ്സിലാകും.\"",
-  },
-  {
-    name: "Priya Subramaniam",
-    city: "Chennai, Tamil Nadu",
-    lang: "தமிழ்",
-    quote: "\"என் அம்மாவுக்கு இப்போது மருந்தைப் பற்றி தமிழில் தெரியும். மிகவும் உதவியாக இருக்கிறது.\"",
-  },
-];
 
 const PRICING = [
   {
-    label: "Free",
+    label: "Explanations",
     price: "₹0",
-    period: "forever",
+    period: "forever, unlimited",
     highlight: false,
     tag: null,
-    features: ["3 free explanations", "All 11 languages", "Photo scan", "No signup needed"],
+    features: ["Unlimited explanations", "All 11 languages", "Photo scan", "Medicine chat", "No signup needed to try"],
     cta: "Try for Free",
   },
   {
-    label: "Pay as you go",
-    price: "₹20",
-    period: "one-time",
+    label: "Talk to a Pharmacist",
+    price: "₹50",
+    period: "per callback",
     highlight: true,
-    tag: "Most Popular",
-    features: ["Unlimited explanations", "All 11 languages", "Photo scan", "Medicine chat", "Explanation history"],
+    tag: "Real Pharmacist",
+    features: ["Certified pharmacist calls you back", "Personalised guidance for your case", "No travel needed", "Usually within 30 minutes"],
     cta: "Get Started",
-  },
-  {
-    label: "Monthly",
-    price: "₹99",
-    period: "per month",
-    highlight: false,
-    tag: null,
-    features: ["Everything in Pay as you go", "Priority AI processing", "Early access to new features"],
-    cta: "Subscribe",
   },
 ];
 
@@ -178,6 +150,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
   const [parallaxY, setParallaxY] = useState(0);
   const [navUser, setNavUser] = useState<{ name: string; avatar_url: string } | null>(null);
   const [showNavMenu, setShowNavMenu] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
   const navMenuRef = useRef<HTMLDivElement>(null);
   useScrollReveal();
 
@@ -312,7 +285,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           </div>
         ) : (
           <button
-            onClick={onEnter}
+            onClick={() => setShowAuth(true)}
             className="text-sm font-semibold px-4 py-2 rounded-xl transition-all active:scale-95"
             style={{ background: "rgba(251,226,167,0.1)", color: "#fbe2a7", border: "1px solid rgba(251,226,167,0.22)" }}
           >
@@ -370,7 +343,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           </p>
 
           {/* Language pills */}
-          <div className="flex flex-wrap justify-center gap-2 mb-8">
+          <div className="hidden sm:flex flex-wrap justify-center gap-2 mb-8">
             {LANGS.map((lang) => (
               <button
                 key={lang}
@@ -409,23 +382,9 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             <span style={{ opacity: 0.6 }}>→</span>
           </button>
 
-          <p className="text-xs" style={{ color: "#6b8a9a" }}>3 free explanations · No signup needed</p>
+          <p className="text-xs" style={{ color: "#6b8a9a" }}>Free, unlimited explanations · No signup needed</p>
         </main>
 
-        {/* Scroll cue */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5" style={{ color: "rgba(251,226,167,0.35)", zIndex: 2 }}>
-          <span style={{ fontSize: 9, letterSpacing: "0.18em" }} className="uppercase">scroll</span>
-          <svg className="bob" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M2 5l5 5 5-5" />
-          </svg>
-        </div>
-
-        {/* Star */}
-        <div className="absolute bottom-5 right-6" style={{ color: "rgba(255,255,255,0.18)", zIndex: 2 }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L13.7 10.3L22 12L13.7 13.7L12 22L10.3 13.7L2 12L10.3 10.3Z" />
-          </svg>
-        </div>
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
@@ -627,66 +586,12 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          TESTIMONIALS — 3D tilt on mouse move
-      ══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16" data-reveal>
-            <SectionLabel>Patient Stories</SectionLabel>
-            <h2 className="font-bold" style={{ fontSize: "clamp(1.8rem, 4vw, 2.8rem)" }}>
-              Families across India trust us
-            </h2>
-          </div>
-
-          <div className="grid sm:grid-cols-3 gap-5">
-            {TESTIMONIALS.map((t, i) => (
-              <div
-                key={t.name}
-                data-reveal
-                data-delay={String(i + 1)}
-                className="rounded-2xl p-6 flex flex-col card-hover"
-                style={{ background: "#0e2030", border: "1px solid rgba(255,255,255,0.07)" }}
-              >
-                {/* Stars */}
-                <div className="flex gap-0.5 mb-4" style={{ color: "#fbe2a7" }}>
-                  {"★★★★★".split("").map((s, j) => <span key={j}>{s}</span>)}
-                </div>
-
-                <p className="text-sm leading-relaxed mb-6 flex-1" style={{ color: "#c4d8e0", fontStyle: "italic" }}>
-                  {t.quote}
-                </p>
-
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                    style={{ background: "rgba(251,226,167,0.12)", color: "#fbe2a7" }}
-                  >
-                    {t.name[0]}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold truncate">{t.name}</p>
-                    <p className="text-xs truncate" style={{ color: "#6b8a9a" }}>{t.city}</p>
-                  </div>
-                  <span
-                    className="ml-auto text-xs px-2 py-0.5 rounded-full flex-shrink-0"
-                    style={{ background: "rgba(251,226,167,0.07)", color: "#fbe2a7", border: "1px solid rgba(251,226,167,0.15)" }}
-                  >
-                    {t.lang}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════════════════════════════════
           PRICING — highlighted card breathes glow
       ══════════════════════════════════════════════════════════════════════ */}
       <section
         id="pricing"
         className="py-24 px-6"
-        style={{ background: "#0e2030" }}
+        style={{ background: "#0d1c24" }}
       >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16" data-reveal>
@@ -694,10 +599,10 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             <h2 className="font-bold mb-4" style={{ fontSize: "clamp(1.8rem, 4vw, 2.8rem)" }}>
               Honest, simple pricing
             </h2>
-            <p style={{ color: "#a8bec9" }}>Start free. Pay only when you need more.</p>
+            <p style={{ color: "#a8bec9" }}>Explanations are free, always. Pay only if you want a real pharmacist on the phone.</p>
           </div>
 
-          <div className="grid sm:grid-cols-3 gap-5">
+          <div className="grid sm:grid-cols-2 gap-5 max-w-2xl mx-auto">
             {PRICING.map((plan, i) => (
               <div
                 key={plan.label}
@@ -778,7 +683,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             Ready to understand your medicine?
           </h2>
           <p className="mb-10 text-base leading-relaxed max-w-lg mx-auto" style={{ color: "#a8bec9" }}>
-            Join thousands of Indian families who now understand their prescriptions clearly — in their own language.
+            Join Indian families who now understand their prescriptions clearly — in their own language.
           </p>
           <button
             onClick={onEnter}
@@ -801,7 +706,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             <span style={{ opacity: 0.6 }}>→</span>
           </button>
           <p className="mt-4 text-xs" style={{ color: "#6b8a9a" }}>
-            3 free explanations · No signup · Works instantly
+            Free, unlimited explanations · No signup · Works instantly
           </p>
         </div>
       </section>
@@ -818,12 +723,21 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           <span className="text-xs" style={{ color: "#4a6a7a" }}>— Medicine Companion</span>
         </div>
 
-        <p className="text-xs text-center" style={{ color: "#4a6a7a" }}>
-          For information only — not medical advice. Always consult your doctor.
-        </p>
+        <div className="text-xs text-center space-y-1.5" style={{ color: "#4a6a7a" }}>
+          <p>For information only — not medical advice. Always consult your doctor.</p>
+          <p>
+            <a href="/privacy" className="hover:opacity-80 transition-opacity">Privacy</a>
+            {" · "}
+            <a href="/terms" className="hover:opacity-80 transition-opacity">Terms</a>
+            {" · "}
+            <a href="/disclaimer" className="hover:opacity-80 transition-opacity">Disclaimer</a>
+          </p>
+        </div>
 
         <p className="text-xs" style={{ color: "#4a6a7a" }}>Made for India</p>
       </footer>
+
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} onSuccess={() => setShowAuth(false)} />}
     </div>
   );
 }

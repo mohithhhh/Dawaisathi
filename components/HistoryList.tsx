@@ -14,7 +14,11 @@ export default function HistoryList({
   if (explanations.length === 0) {
     return (
       <div className="text-center py-10">
-        <p className="text-4xl mb-3">💊</p>
+        <div className="flex justify-center mb-3">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(168,190,201,0.4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m10.5 20.5-8-8a5 5 0 1 1 7-7l8 8a5 5 0 1 1-7 7Z"/><path d="m8.5 8.5 7 7"/>
+          </svg>
+        </div>
         <p className="text-text-secondary">No explanations yet</p>
         <p className="text-muted text-sm mt-1">
           Search for a medicine to get started

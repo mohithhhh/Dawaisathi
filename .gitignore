@@ -220,3 +220,8 @@ node_modules/
 # Vercel
 .vercel
 .env*.local
+node_modules/
+.expo/
+dist/
+build/
+.DS_Store

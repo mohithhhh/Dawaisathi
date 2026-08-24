@@ -2,10 +2,19 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { Language } from "@/types";
+import BuyMedicineLinks from "@/components/BuyMedicineLinks";
+import NearbyHelp from "@/components/NearbyHelp";
+import JanaushadhiMatch from "@/components/JanaushadhiMatch";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+}
+
+interface JanaushadhiProductInfo {
+  generic_name: string;
+  unit_size: string;
+  mrp: number;
 }
 
 interface ChatInterfaceProps {
@@ -13,6 +22,7 @@ interface ChatInterfaceProps {
   initialMessages?: Message[];
   medicineName?: string;
   onAskPharmacist?: () => void;
+  janaushadhiMatch?: JanaushadhiProductInfo | null;
 }
 
 function renderContent(content: string) {
@@ -56,11 +66,15 @@ function AssistantAvatar() {
   );
 }
 
-export default function ChatInterface({ language, initialMessages = [], onAskPharmacist }: ChatInterfaceProps) {
+export default function ChatInterface({ language, initialMessages = [], medicineName, onAskPharmacist, janaushadhiMatch }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState("");
+  const [showComingSoon, setShowComingSoon] = useState(false);
+  const [showBuyLinks, setShowBuyLinks] = useState(false);
+  const [showNearby, setShowNearby] = useState(false);
+  const [showJanaushadhi, setShowJanaushadhi] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -254,6 +268,31 @@ export default function ChatInterface({ language, initialMessages = [], onAskPha
         )}
       </div>
 
+      {/* Jan Aushadhi generic match inline — shown when toggled */}
+      {showJanaushadhi && janaushadhiMatch && (
+        <div className="pt-2 pb-1">
+          <JanaushadhiMatch
+            genericName={janaushadhiMatch.generic_name}
+            unitSize={janaushadhiMatch.unit_size}
+            mrp={janaushadhiMatch.mrp}
+          />
+        </div>
+      )}
+
+      {/* Nearby inline — shown when toggled */}
+      {showNearby && (
+        <div className="pt-2 pb-1">
+          <NearbyHelp />
+        </div>
+      )}
+
+      {/* Buy links inline — shown when toggled */}
+      {showBuyLinks && medicineName && (
+        <div className="pb-1">
+          <BuyMedicineLinks medicineName={medicineName} />
+        </div>
+      )}
+
       {/* Error banner */}
       {error && (
         <div className="flex justify-center pb-2 px-2">
@@ -286,25 +325,105 @@ export default function ChatInterface({ language, initialMessages = [], onAskPha
         </div>
       )}
 
-      {/* Ask a pharmacist */}
-      {onAskPharmacist && (
-        <div className="flex justify-center pb-2 pt-1">
+      {/* Buy medicine + Nearby + Ask a pharmacist — floating action row */}
+      {!isEmpty && (medicineName || onAskPharmacist) && (
+        <div className="flex justify-center gap-2 pb-2 pt-1 flex-wrap">
+          {medicineName && (
+            <button
+              onClick={() => setShowBuyLinks((v) => !v)}
+              className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-full transition-all"
+              style={{
+                background: showBuyLinks ? "rgba(251,226,167,0.14)" : "rgba(251,226,167,0.07)",
+                border: "1px solid rgba(251,226,167,0.25)",
+                color: "#fbe2a7",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(251,226,167,0.14)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = showBuyLinks ? "rgba(251,226,167,0.14)" : "rgba(251,226,167,0.07)"; }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+              </svg>
+              Order online
+            </button>
+          )}
+          {janaushadhiMatch && (
+            <button
+              onClick={() => setShowJanaushadhi((v) => !v)}
+              className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-full transition-all"
+              style={{
+                background: showJanaushadhi ? "rgba(74,222,128,0.14)" : "rgba(74,222,128,0.07)",
+                border: "1px solid rgba(74,222,128,0.25)",
+                color: "#4ade80",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.14)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = showJanaushadhi ? "rgba(74,222,128,0.14)" : "rgba(74,222,128,0.07)"; }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z" />
+                <line x1="16" y1="8" x2="2" y2="22" />
+                <line x1="17.5" y1="15" x2="9" y2="15" />
+              </svg>
+              Cheaper generic
+            </button>
+          )}
           <button
-            onClick={onAskPharmacist}
+            onClick={() => setShowNearby((v) => !v)}
             className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-full transition-all"
             style={{
-              background: "rgba(74,222,128,0.07)",
-              border: "1px solid rgba(74,222,128,0.2)",
-              color: "#4ade80",
+              background: showNearby ? "rgba(168,190,201,0.14)" : "rgba(168,190,201,0.07)",
+              border: "1px solid rgba(168,190,201,0.25)",
+              color: "#a8bec9",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.13)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.07)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(168,190,201,0.14)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = showNearby ? "rgba(168,190,201,0.14)" : "rgba(168,190,201,0.07)"; }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
             </svg>
-            Ask a pharmacist
+            Nearby
           </button>
+          {onAskPharmacist && (
+            <button
+              onClick={() => setShowComingSoon(true)}
+              className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-full transition-all"
+              style={{
+                background: "rgba(74,222,128,0.07)",
+                border: "1px solid rgba(74,222,128,0.2)",
+                color: "#4ade80",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.13)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(74,222,128,0.07)"; }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              Ask a pharmacist
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Coming Soon modal */}
+      {showComingSoon && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowComingSoon(false)}>
+          <div className="rounded-2xl p-8 max-w-sm w-full text-center" style={{ background: "#12242e", border: "1px solid rgba(255,255,255,0.08)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-4">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fbe2a7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
+            </div>
+            <h3 className="font-bold text-lg mb-2" style={{ color: "#f0f8ff" }}>Coming Soon</h3>
+            <p className="text-sm mb-6" style={{ color: "#a8bec9" }}>
+              Connect with a real pharmacist for personalised guidance. We're working on it!
+            </p>
+            <button
+              onClick={() => setShowComingSoon(false)}
+              className="px-6 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95"
+              style={{ background: "rgba(251,226,167,0.12)", color: "#fbe2a7", border: "1px solid rgba(251,226,167,0.2)" }}
+            >
+              Got it
+            </button>
+          </div>
         </div>
       )}
 

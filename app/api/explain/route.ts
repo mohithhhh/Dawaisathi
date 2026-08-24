@@ -1,73 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import type { Language } from "@/types";
-
-const LANGUAGE_NAMES: Record<Language, string> = {
-  hindi: "Hindi",
-  english: "English",
-  bengali: "Bengali",
-  gujarati: "Gujarati",
-  kannada: "Kannada",
-  malayalam: "Malayalam",
-  marathi: "Marathi",
-  odia: "Odia",
-  punjabi: "Punjabi",
-  tamil: "Tamil",
-  telugu: "Telugu",
-};
-
-function buildExplainPrompt(medicineName: string): string {
-  return `You are a medicine information assistant for Indian patients.
-
-Medicine: ${medicineName}
-
-Explain this medicine in English using exactly this structure:
-
-**What is this medicine?**
-What condition this treats — one simple sentence.
-
-**How to take it?**
-When to take, how many times a day, before or after food.
-
-**Important warning**
-One critical thing — side effect, food to avoid, or storage.
-
-**Other brand names**
-2-3 Indian brand names for the same medicine.
-
-Rules:
-- Simple English, zero medical jargon
-- Each section 2-3 sentences maximum
-- Warm pharmacist tone
-- Total under 150 words
-
-Respond directly, no preamble.`;
-}
+import { FREE_TIER_LIMIT } from "@/types";
+import { geminiExplain, geminiTranslate, geminiPost, extractGenericName } from "@/lib/ai";
+import { matchJanaushadhi } from "@/lib/janaushadhi";
 
 async function geminiOCR(imageBase64: string, mimeType: string): Promise<string> {
-  const apiKey = process.env.GOOGLE_API_KEY;
-
   const DOSAGE_PATTERN = /\b\d+\s*(mg|ml|mcg|iu|g|%)\b|\b(tab\.?|cap\.?|syp\.?|inj\.?|oint\.?|susp\.?|tablet|capsule|syrup|injection|cream|drops?|patch|lotion)\b/gi;
 
   const cleanName = (s: string) =>
     s.replace(DOSAGE_PATTERN, "").replace(/\s+/g, " ").trim();
 
   const callGemini = async (promptText: string, temp = 0): Promise<string> => {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inlineData: { mimeType, data: imageBase64 } },
-              { text: promptText },
-            ],
-          }],
-          generationConfig: { maxOutputTokens: 80, temperature: temp, thinkingConfig: { thinkingBudget: 0 } },
-        }),
-      }
-    );
+    const res = await geminiPost({
+      contents: [{
+        parts: [
+          { inlineData: { mimeType, data: imageBase64 } },
+          { text: promptText },
+        ],
+      }],
+      generationConfig: { maxOutputTokens: 80, temperature: temp, thinkingConfig: { thinkingBudget: 0 } },
+    });
     if (!res.ok) throw new Error(`Gemini OCR failed: ${res.status}`);
     const data = await res.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "UNKNOWN";
@@ -90,7 +43,6 @@ If you truly cannot read any medicine name, return exactly: UNKNOWN`;
   let result = cleanName(await callGemini(primaryPrompt, 0));
 
   if (!result || result.toUpperCase() === "UNKNOWN") {
-    // Fallback: simpler broad prompt with slight temperature
     const fallback = cleanName(
       await callGemini(
         `What medicine is shown in this image? Read all text carefully — the package may be at an angle or partially blurry. Return only the medicine name (brand or generic). If you cannot determine the medicine name at all, return UNKNOWN.`,
@@ -103,48 +55,6 @@ If you truly cannot read any medicine name, return exactly: UNKNOWN`;
   return result || "UNKNOWN";
 }
 
-async function geminiExplain(medicineName: string): Promise<string> {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: buildExplainPrompt(medicineName) }] }],
-        generationConfig: { maxOutputTokens: 800, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
-      }),
-    }
-  );
-  if (!res.ok) throw new Error(`Gemini explain failed: ${res.status}`);
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-}
-
-async function geminiTranslate(text: string, targetLanguage: Language): Promise<string> {
-  if (targetLanguage === "english") return text;
-  const apiKey = process.env.GOOGLE_API_KEY;
-  const langName = LANGUAGE_NAMES[targetLanguage];
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `Translate this medicine explanation from English to ${langName}. Keep medicine brand names and drug names in English. Translate everything else including section headers. Output ONLY the translated text, no preamble:\n\n${text}`,
-          }],
-        }],
-        generationConfig: { maxOutputTokens: 2000, temperature: 0, thinkingConfig: { thinkingBudget: 0 } },
-      }),
-    }
-  );
-  if (!res.ok) return text;
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
@@ -154,6 +64,51 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       );
     }
+
+    // ── Auth + plan check ─────────────────────────────────────────────────────
+    // anon client with session cookies — used only for auth.getUser()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return request.cookies.getAll(); },
+          setAll() {},
+        },
+      }
+    );
+    // service-role client — bypasses RLS for trusted server-side writes
+    const supabaseAdmin = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { cookies: { getAll: () => [], setAll: () => {} } }
+    );
+
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase
+      .from("users")
+      .select("plan, explanation_count, subscription_end")
+      .eq("id", authUser.id)
+      .single();
+
+    const now = new Date();
+    const subscriptionActive =
+      profile?.plan === "subscription" &&
+      profile.subscription_end != null &&
+      new Date(profile.subscription_end) > now;
+    const canExplain =
+      subscriptionActive ||
+      profile?.plan === "paid" ||
+      (profile?.explanation_count ?? 0) < FREE_TIER_LIMIT;
+
+    if (!canExplain) {
+      return NextResponse.json({ error: "Free limit reached. Please upgrade." }, { status: 402 });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     const body = await request.json();
     const { medicine_name, language, image_base64, image_media_type }: {
@@ -195,16 +150,59 @@ export async function POST(request: NextRequest) {
         try {
           send(`data: ${JSON.stringify({ type: "medicine_name", medicine_name: finalMedicineName })}\n\n`);
 
-          const englishExplanation = await geminiExplain(finalMedicineName!);
-          if (!englishExplanation) {
+          const rawExplanation = await geminiExplain(finalMedicineName!);
+          if (!rawExplanation) {
             send(`data: ${JSON.stringify({ type: "error", error: "Could not generate explanation. Please try again." })}\n\n`);
             controller.close();
             return;
           }
+          const { genericName, explanation: englishExplanation } = extractGenericName(rawExplanation);
+
+          // Best-effort Jan Aushadhi generic-price lookup — prefer the generic
+          // name Gemini just resolved (handles brand names like "Dolo 650"
+          // correctly); fall back to the raw input if that failed. Never let
+          // a matching problem break the explanation itself.
+          try {
+            const [best] = matchJanaushadhi(genericName || finalMedicineName!, 1, 0.5);
+            if (best) {
+              send(`data: ${JSON.stringify({
+                type: "janaushadhi_match",
+                product: {
+                  generic_name: best.product.generic_name,
+                  unit_size: best.product.unit_size,
+                  mrp: best.product.mrp,
+                },
+                score: best.score,
+              })}\n\n`);
+            }
+          } catch (matchError) {
+            console.error("Janaushadhi match failed:", matchError);
+          }
 
           const fullExplanation = await geminiTranslate(englishExplanation, language);
           send(`data: ${JSON.stringify({ type: "text", text: fullExplanation })}\n\n`);
-          send(`data: ${JSON.stringify({ type: "done", usage_count: null, plan: "free" })}\n\n`);
+
+          // Update usage + save explanation (awaited so client re-fetch sees fresh data)
+          const currentPlan = profile?.plan ?? "free";
+          const currentCount = profile?.explanation_count ?? 0;
+          // Upsert users row first (FK dependency), then insert explanation
+          if (currentPlan === "free") {
+            const { error: upsertErr } = await supabaseAdmin.from("users").upsert(
+              { id: authUser.id, plan: "free", explanation_count: currentCount + 1 },
+              { onConflict: "id" }
+            );
+            if (upsertErr) console.error("User upsert failed:", upsertErr);
+          }
+          const { error: explainErr } = await supabaseAdmin.from("explanations").insert({
+            user_id: authUser.id,
+            medicine_name: finalMedicineName,
+            language,
+            explanation_text: fullExplanation,
+          });
+          if (explainErr) console.error("Explanation insert failed:", explainErr);
+
+          const newCount = currentPlan === "free" ? currentCount + 1 : currentCount;
+          send(`data: ${JSON.stringify({ type: "done", usage_count: newCount, plan: currentPlan })}\n\n`);
           controller.close();
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unknown error";
@@ -222,6 +220,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+
     console.error("Explain API error:", error);
     return NextResponse.json(
       { error: "Internal server error. Please try again." },

@@ -11,8 +11,11 @@ import ChatInterface from "@/components/ChatInterface";
 import PaywallModal from "@/components/PaywallModal";
 import UsageBar from "@/components/UsageBar";
 import LandingPage from "@/components/LandingPage";
+import PrescriptionTab from "@/components/PrescriptionTab";
 import type { Language, UserProfile } from "@/types";
 import { FREE_TIER_LIMIT, LANGUAGE_LABELS } from "@/types";
+import { track } from "@/lib/posthog";
+
 
 const FREE_STORAGE_KEY = "dw_free_count";
 
@@ -21,6 +24,145 @@ function toTitleCase(s: string) {
 }
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
+type JanaushadhiProductInfo = { generic_name: string; unit_size: string; mrp: number };
+
+// ─── Pharmacist Payment Modal ─────────────────────────────────────────────────
+function PharmacistPaymentModal({
+  onClose,
+  onSuccess,
+  user,
+  medicineName,
+  language,
+  explanation,
+}: {
+  onClose: () => void;
+  onSuccess: () => void;
+  user: UserProfile;
+  medicineName: string;
+  language: Language;
+  explanation: string;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadRazorpay = (): Promise<boolean> =>
+    new Promise((resolve) => {
+      if (window.Razorpay) { resolve(true); return; }
+      const s = document.createElement("script");
+      s.src = "https://checkout.razorpay.com/v1/checkout.js";
+      s.onload = () => resolve(true);
+      s.onerror = () => resolve(false);
+      document.head.appendChild(s);
+    });
+
+  const handlePay = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const loaded = await loadRazorpay();
+      if (!loaded) { setError("Payment gateway failed to load. Check internet."); setLoading(false); return; }
+
+      const orderRes = await fetch("/api/payment/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_type: "pharmacist" }),
+      });
+      if (!orderRes.ok) { setError("Could not create order. Please try again."); setLoading(false); return; }
+      const orderData = await orderRes.json();
+
+      const options = {
+        key: orderData.key_id,
+        amount: orderData.amount,
+        currency: "INR",
+        name: "DawaiSathi",
+        description: "Pharmacist Callback — Priority Support",
+        order_id: orderData.order_id,
+        prefill: { contact: user.phone || "" },
+        theme: { color: "#fbe2a7" },
+        handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+          try {
+            const verifyRes = await fetch("/api/payment/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                payment_type: "pharmacist",
+                callback_data: {
+                  medicine_name: medicineName,
+                  language,
+                  explanation,
+                  phone: user.phone || "",
+                },
+              }),
+            });
+            if (verifyRes.ok) { setLoading(false); onSuccess(); }
+            else { setError("Payment verification failed. Contact support."); setLoading(false); }
+          } catch { setError("Verification error. Contact support."); setLoading(false); }
+        },
+        modal: { ondismiss: () => setLoading(false) },
+      };
+
+      const RzpClass = (window as unknown as { Razorpay: new (opts: Record<string, unknown>) => { open: () => void } }).Razorpay;
+      const rzp = new RzpClass(options);
+      rzp.open();
+    } catch { setError("Something went wrong. Please try again."); setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-surface border border-border rounded-2xl w-full max-w-sm p-6 animate-slide-up">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-text-primary font-semibold text-lg">Talk to a Pharmacist</h2>
+            <p className="text-text-secondary text-sm mt-1">A licensed pharmacist will call you</p>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-text-primary transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-2">✕</button>
+        </div>
+
+        <div className="rounded-xl border border-border p-4 mb-4 space-y-2.5">
+          <div className="flex items-start gap-3">
+            <span className="text-lg">💊</span>
+            <div>
+              <p className="text-text-primary text-sm font-medium">{medicineName}</p>
+              <p className="text-muted text-xs mt-0.5">Medicine under discussion</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="text-lg">📞</span>
+            <div>
+              <p className="text-text-primary text-sm font-medium">Callback within 30 minutes</p>
+              <p className="text-muted text-xs mt-0.5">Mon–Sat, 9am–9pm IST</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="text-lg">🔒</span>
+            <div>
+              <p className="text-text-primary text-sm font-medium">Private consultation</p>
+              <p className="text-muted text-xs mt-0.5">Confidential, in your language</p>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={handlePay}
+          disabled={loading}
+          className="w-full rounded-xl py-3 font-bold text-sm transition-all"
+          style={{ background: loading ? "rgba(251,226,167,0.4)" : "#fbe2a7", color: "#0d1c24", cursor: loading ? "not-allowed" : "pointer" }}
+        >
+          {loading ? "Opening payment…" : "Pay ₹50 — Request Callback"}
+        </button>
+
+        {error && <p className="text-danger/80 text-xs text-center mt-3">⚠ {error}</p>}
+
+        <p className="text-muted text-xs text-center mt-3">
+          Secure payment via Razorpay · UPI, Cards, Net Banking
+        </p>
+      </div>
+    </div>
+  );
+}
 
 // ─── App Tool ─────────────────────────────────────────────────────────────────
 function AppTool({ onGoHome }: { onGoHome: () => void }) {
@@ -28,10 +170,13 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
   const searchParams = useSearchParams();
   const supabase = createClient();
 
+  const [activeTab, setActiveTab] = useState<"explain" | "prescription">("explain");
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showPharmacistPayment, setShowPharmacistPayment] = useState(false);
+  const [pharmacistRequested, setPharmacistRequested] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +193,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
   // Chat state
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
+  const [janaushadhiMatch, setJanaushadhiMatch] = useState<JanaushadhiProductInfo | null>(null);
   const explanationAccum = useRef("");
 
   // Free query counter
@@ -67,13 +213,19 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (authUser) {
+        const { data: profile } = await supabase
+          .from("users")
+          .select("plan, explanation_count, subscription_end")
+          .eq("id", authUser.id)
+          .single();
         setUser({
           id: authUser.id,
           phone: authUser.phone,
           name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split("@")[0] || "",
           avatar_url: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || "",
-          plan: "free",
-          explanation_count: 0,
+          plan: profile?.plan || "free",
+          explanation_count: profile?.explanation_count || 0,
+          subscription_end: profile?.subscription_end || undefined,
           created_at: authUser.created_at,
         });
       } else {
@@ -96,8 +248,21 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
     try {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         async (event: string) => {
-          if (event === "SIGNED_IN") await fetchUserProfile();
-          else if (event === "SIGNED_OUT") setUser(null);
+          if (event === "SIGNED_IN") {
+            await fetchUserProfile();
+            const pendingPhone = localStorage.getItem("pendingPhone");
+            if (pendingPhone) {
+              await fetch("/api/user/save-phone", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: pendingPhone }),
+              });
+              localStorage.removeItem("pendingPhone");
+              await fetchUserProfile();
+            }
+          } else if (event === "SIGNED_OUT") {
+            setUser(null);
+          }
         }
       );
       unsubscribe = () => subscription.unsubscribe();
@@ -121,6 +286,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
   }, [showUserMenu]);
 
   const handleImageSelect = (base64: string, mediaType: string) => {
+    track("photo_uploaded", { status: "success" });
     setImageBase64(base64);
     setImageMediaType(mediaType);
     setMedicineName("");
@@ -136,6 +302,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
   const handleSearchAgain = () => {
     setShowChat(false);
     setChatMessages([]);
+    setJanaushadhiMatch(null);
     setExtractedMedicine("");
     setMedicineName("");
     setImageBase64("");
@@ -157,6 +324,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
 
     setError("");
     setExtractedMedicine("");
+    setJanaushadhiMatch(null);
     explanationAccum.current = "";
     setIsLoading(true);
 
@@ -172,7 +340,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
         }),
       });
 
-      if (res.status === 402) { setShowPaywall(true); setIsLoading(false); return; }
+      if (res.status === 402) { track("paywall_shown"); setShowPaywall(true); setIsLoading(false); return; }
       if (!res.ok) {
         const data = await res.json();
         setError(data.error || "Something went wrong. Please try again.");
@@ -202,9 +370,16 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
             if (data.type === "medicine_name") {
               setExtractedMedicine(data.medicine_name);
               if (!medicineName && data.medicine_name) setMedicineName(data.medicine_name);
+            } else if (data.type === "janaushadhi_match") {
+              setJanaushadhiMatch(data.product);
             } else if (data.type === "text") {
               explanationAccum.current += data.text;
             } else if (data.type === "done") {
+              track("medicine_explained", {
+                medicine: extractedMedicine || medicineName,
+                language,
+                source: imageBase64 ? "photo" : "typed",
+              });
               const initialMsg: ChatMsg = { role: "assistant", content: explanationAccum.current };
               setChatMessages([initialMsg]);
               setIsLoading(false);
@@ -327,8 +502,39 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
       {/* Main */}
       <main className={`flex-1 w-full flex flex-col ${showChat ? "max-w-4xl mx-auto px-6 sm:px-10 pt-0 pb-0" : "px-4 sm:px-6"}`}>
 
-        {/* Form view — vertically centered, no scroll needed */}
+        {/* Floating tab toggle */}
         {!showChat && !isLoading && (
+          <div className="flex justify-center pt-6">
+            <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <button
+                onClick={() => setActiveTab("explain")}
+                className="text-sm px-5 py-1.5 rounded-lg transition-all font-medium"
+                style={activeTab === "explain"
+                  ? { background: "rgba(251,226,167,0.14)", color: "#fbe2a7" }
+                  : { color: "#6b8a9a" }}
+              >
+                Explain
+              </button>
+              <button
+                onClick={() => setActiveTab("prescription")}
+                className="text-sm px-5 py-1.5 rounded-lg transition-all font-medium"
+                style={activeTab === "prescription"
+                  ? { background: "rgba(251,226,167,0.14)", color: "#fbe2a7" }
+                  : { color: "#6b8a9a" }}
+              >
+                Prescription
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Prescription tab */}
+        {activeTab === "prescription" && !showChat && (
+          <PrescriptionTab onGoExplain={() => setActiveTab("explain")} />
+        )}
+
+        {/* Form view — vertically centered, no scroll needed */}
+        {activeTab === "explain" && !showChat && !isLoading && (
           <div className="flex-1 flex flex-col items-center justify-center py-6 gap-3">
             {user && !authLoading && (
               <div className="w-full max-w-[680px]">
@@ -360,7 +566,7 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
                 isLoading={imageLoading && isLoading}
               />
 
-              <LanguageSelector selected={language} onChange={setLanguage} disabled={isLoading} />
+              <LanguageSelector selected={language} onChange={(l) => { track("language_selected", { language: l }); setLanguage(l); }} disabled={isLoading} />
 
               <button
                 onClick={handleSubmit}
@@ -393,8 +599,8 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
           </div>
         )}
 
-        {/* Loading animation */}
-        <div ref={chatRef} className={showChat ? "flex-1 flex flex-col min-h-0" : ""}>
+        {/* Loading animation + chat — explain tab only */}
+        <div ref={chatRef} className={showChat ? "flex-1 flex flex-col min-h-0" : (activeTab === "explain" && isLoading) ? "flex-1 flex flex-col" : ""}>
           {isLoading && (
             <div className="app-section flex-1 flex flex-col items-center justify-center gap-5">
               <div className="relative w-14 h-14">
@@ -416,7 +622,13 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
                 language={language}
                 initialMessages={chatMessages}
                 medicineName={displayMedicine}
-                onAskPharmacist={() => setShowAuth(true)}
+                janaushadhiMatch={janaushadhiMatch}
+                onAskPharmacist={() => {
+                  track("pharmacist_requested", { language, medicine: displayMedicine });
+                  if (!user) { setShowAuth(true); }
+                  else if (pharmacistRequested) { /* already requested — no-op */ }
+                  else { setShowPharmacistPayment(true); }
+                }}
               />
             </div>
           )}
@@ -424,13 +636,30 @@ function AppTool({ onGoHome }: { onGoHome: () => void }) {
       </main>
 
       {!showChat && (
-        <footer className="pb-6 text-center">
+        <footer className="pb-6 text-center space-y-1">
           <p className="text-muted/30 text-xs">For information only — not medical advice</p>
+          <p className="text-xs" style={{ color: "#2a4a5a" }}>
+            <a href="/privacy" className="hover:opacity-70 transition-opacity">Privacy</a>
+            {" · "}
+            <a href="/terms" className="hover:opacity-70 transition-opacity">Terms</a>
+            {" · "}
+            <a href="/disclaimer" className="hover:opacity-70 transition-opacity">Disclaimer</a>
+          </p>
         </footer>
       )}
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onSuccess={handleAuthSuccess} />}
       {showPaywall && <PaywallModal onClose={() => setShowPaywall(false)} onSuccess={handlePaymentSuccess} user={user} />}
+      {showPharmacistPayment && user && (
+        <PharmacistPaymentModal
+          onClose={() => setShowPharmacistPayment(false)}
+          onSuccess={() => { setShowPharmacistPayment(false); setPharmacistRequested(true); }}
+          user={user}
+          medicineName={displayMedicine}
+          language={language}
+          explanation={chatMessages[0]?.content || ""}
+        />
+      )}
     </div>
   );
 }
